@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Music Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .description {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto 30px;
+            line-height: 1.6;
+        }
+        .video-container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+            margin: 20px auto;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            object-fit: cover;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 0 5px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button.secondary {
+            background-color: #2196F3;
+        }
+        button.secondary:hover {
+            background-color: #0b7dda;
+        }
+        button.tertiary {
+            background-color: #9C27B0;
+        }
+        button.tertiary:hover {
+            background-color: #7B1FA2;
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #e8f5e9;
+            border-radius: 4px;
+            font-size: 18px;
+        }
+        .panels {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        .panel {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            flex: 1 0 300px;
+            max-width: 500px;
+        }
+        .panel h3 {
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .control-group {
+            margin: 15px 0;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select, input {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #666;
+        }
+        .zone-info {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+        }
+        .zone-info h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .zone {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .zone-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+        .left-zone-color {
+            background-color: rgba(50, 50, 150, 0.6);
+        }
+        .center-zone-color {
+            background-color: rgba(255, 255, 255, 0.6);
+        }
+        .right-zone-color {
+            background-color: rgba(150, 50, 50, 0.6);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Interactive Music Generator</h1>
+        </div>
+        
+        <div class="description">
+            <p>使用摄像头识别物品，根据物品在画面中的位置和特征生成音乐。物品的垂直位置（Y坐标）控制音高，水平位置（X坐标）控制音效，物品类型控制音色。</p>
+        </div>
+        
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button id="startButton">开始摄像头</button>
+            <button id="stopButton">停止摄像头</button>
+            <button id="toggleVisualization" class="secondary">切换可视化效果</button>
+            <button id="toggleZones" class="tertiary">切换区域显示</button>
+        </div>
+        
+        <div class="status" id="status">等待启动...</div>
+        
+        <div class="panels">
+            <div class="panel">
+                <h3>音乐设置</h3>
+                <div class="control-group">
+                    <label for="scale-select">音阶</label>
+                    <select id="scale-select">
+                        <option value="major">大调</option>
+                        <option value="minor">小调</option>
+                        <option value="pentatonic">五声音阶</option>
+                        <option value="blues">蓝调音阶</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="rhythm-select">节奏型</label>
+                    <select id="rhythm-select">
+                        <option value="basic">基本</option>
+                        <option value="techno">电子</option>
+                        <option value="jazz">爵士</option>
+                        <option value="latin">拉丁</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="volume-slider">音量</label>
+                    <input type="range" id="volume-slider" min="0" max="100" value="80">
+                </div>
+                
+                <div class="zone-info">
+                    <h4>区域说明</h4>
+                    <div class="zone">
+                        <div class="zone-color left-zone-color"></div>
+                        <div>左侧区域：低音节奏区，产生低沉的节奏音效</div>
+                    </div>
+                    <div class="zone">
+                        <div class="zone-color center-zone-color"></div>
+                        <div>中央区域：正常音效区，标准音效</div>
+                    </div>
+                    <div class="zone">
+                        <div class="zone-color right-zone-color"></div>
+                        <div>右侧区域：高音滑音区，产生滑音效果</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>检测物品</h3>
+                <div id="detected-object">未检测到物品</div>
+                <div id="object-info"></div>
+                <ul id="object-list" class="object-list"></ul>
+                
+                <div class="control-group" style="margin-top: 20px;">
+                    <p style="margin-bottom: 10px;">通过以下方式控制音乐：</p>
+                    <ul style="margin-left: 20px;">
+                        <li>垂直位置（Y轴）：控制音高</li>
+                        <li>水平位置（X轴）：控制音效类型</li>
+                        <li>物品类型：控制音色</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Interactive Music Generator &copy; 2023</p>
+        </div>
+    </div>
+    
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html> 
