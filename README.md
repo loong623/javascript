@@ -2,15 +2,17 @@
 
 ## Introduction 简介
 
-This is an interactive music generator based on computer vision. Through camera object recognition, it generates music in real-time according to the position and characteristics of objects.
+This is an interactive music generator based on computer vision. Through camera object recognition, it generates music in real-time according to the position and characteristics of objects. The system uses an advanced sequencer architecture with noise cancellation technology.
 
-这是一个基于计算机视觉的交互式音乐生成器。通过摄像头识别特定物品，根据物品的位置和特征实时生成音乐。
+这是一个基于计算机视觉的交互式音乐生成器。通过摄像头识别特定物品，根据物品的位置和特征实时生成音乐。系统采用先进的音序器架构和噪音消除技术。
 
 ## Features 功能特点
 
 - Real-time camera video stream processing
 - Object recognition and tracking
 - Real-time music generation based on object position and characteristics
+- Advanced sequencer architecture with quantized timing
+- Enhanced noise cancellation and audio quality optimization
 - Customizable timbre, pitch, and rhythm patterns
 - Interactive sound zones with different musical behaviors
 - Visual feedback with customizable display options
@@ -20,6 +22,8 @@ This is an interactive music generator based on computer vision. Through camera 
 - 实时摄像头视频流处理
 - 物品识别和追踪
 - 基于物品位置和特征的实时音乐生成
+- 先进的音序器架构，实现量化定时
+- 增强的噪音消除和音频质量优化
 - 可自定义音色、音高和节奏型
 - 具有不同音乐行为的交互式声音区域
 - 可自定义显示选项的视觉反馈
@@ -27,8 +31,8 @@ This is an interactive music generator based on computer vision. Through camera 
 ## Technology Stack 技术栈
 
 - TensorFlow.js - For object recognition
-- Tone.js - For advanced audio synthesis and effects
-- Web Audio API - For audio generation
+- Tone.js - For advanced audio synthesis, sequencing and effects
+- Web Audio API - For audio generation and processing
 - MediaDevices API - For camera access
 - Canvas API - For video processing and visualization
 - Vite - For development and build tooling
@@ -36,8 +40,8 @@ This is an interactive music generator based on computer vision. Through camera 
 ---
 
 - TensorFlow.js - 用于物品识别
-- Tone.js - 用于高级音频合成和效果
-- Web Audio API - 用于音频生成
+- Tone.js - 用于高级音频合成、音序和效果
+- Web Audio API - 用于音频生成和处理
 - MediaDevices API - 用于摄像头访问
 - Canvas API - 用于视频处理和可视化
 - Vite - 用于开发和构建工具
@@ -83,14 +87,14 @@ This is an interactive music generator based on computer vision. Through camera 
 4. The horizontal position (X-coordinate) controls rhythm and sound effects:
    物品的水平位置（X坐标）控制节奏和音效：
    
-   - Left zone (0-30%): Bass rhythm area
-     左侧区域（0-30%）：低音节奏区
+   - Left zone (0-30%): Bass rhythm area with minimal delay effect
+     左侧区域（0-30%）：低音节奏区，具有最小延迟效果
      
-   - Center zone (30-70%): Standard tone area
-     中央区域（30-70%）：标准音区
+   - Center zone (30-70%): Standard tone area with moderate effects
+     中央区域（30-70%）：标准音区，具有适中效果
      
-   - Right zone (70-100%): High-pitched glide area
-     右侧区域（70-100%）：高音滑音区
+   - Right zone (70-100%): High-pitched glide area with enhanced delay effect
+     右侧区域（70-100%）：高音滑音区，具有增强延迟效果
      
 5. The object type (e.g., phone, book) controls the timbre
    物品的类型（如手机、书本）控制音色
@@ -130,28 +134,61 @@ This is an interactive music generator based on computer vision. Through camera 
 
 ```
 interactive-music-generator/
-├── public/              # Static assets 静态资源
-├── src/                 # Source code 源代码
-│   ├── components/      # UI components UI组件
-│   │   ├── controls.js  # User interface controls 用户界面控制
-│   │   └── visualizer.js # Visual feedback visualization 视觉反馈可视化
+├── public/                # Static assets 静态资源
+├── src/                   # Source code 源代码
+│   ├── components/        # UI components UI组件
+│   │   ├── controls.js    # User interface controls 用户界面控制
+│   │   └── visualizer.js  # Visual feedback visualization 视觉反馈可视化
 │   │
-│   ├── models/          # Machine learning models 机器学习模型
+│   ├── models/            # Machine learning models 机器学习模型
 │   │   └── visionModel.js # TensorFlow object detection model TensorFlow物体检测模型
 │   │
-│   ├── audio/           # Audio processing 音频处理
-│   │   └── audioEngine.js # Tone.js sound generation engine Tone.js音频生成引擎
+│   ├── audio/             # Audio processing 音频处理
+│   │   ├── audioEngine.js # Tone.js sound generation engine Tone.js音频生成引擎
+│   │   ├── effects/       # Audio effects for enhanced sound quality 用于增强音质的音频效果
+│   │   │   ├── effectsChain.js  # Effects chain management 效果链管理
+│   │   │   └── noiseUtils.js    # Noise cancellation utilities 噪音消除工具
+│   │   ├── instruments/   # Sound synthesis instruments 声音合成乐器
+│   │   │   └── synthFactory.js  # Synthesizer factory 合成器工厂
+│   │   └── sequencer/     # Rhythm and pattern handling 节奏和模式处理
+│   │       ├── patternManager.js # Musical pattern management 音乐模式管理
+│   │       └── stepSequencer.js  # Step sequencer engine 步进音序器引擎
 │   │
-│   ├── utils/           # Utility functions 工具函数
-│   │   └── helpers.js   # Helper utilities 辅助工具
+│   ├── utils/             # Utility functions 工具函数
+│   │   └── helpers.js     # Helper utilities 辅助工具
 │   │
-│   └── main.js         # Application entry point 应用程序入口点
+│   └── main.js            # Application entry point 应用程序入口点
 │
-├── index.html           # Main HTML file 主HTML文件
-├── vite.config.js       # Vite configuration Vite配置
-├── package.json         # Project dependencies 项目依赖
-└── README.md            # Project documentation 项目文档
+├── index.html             # Main HTML file 主HTML文件
+├── vite.config.js         # Vite configuration Vite配置
+├── package.json           # Project dependencies 项目依赖
+└── README.md              # Project documentation 项目文档
 ```
+
+## Audio Architecture Overview 音频架构概述
+
+The system uses a modular sequencer architecture with these key components:
+
+系统采用模块化音序器架构，包含以下关键组件：
+
+1. **Step Sequencer** - Provides beat-synchronized timing and pattern sequencing
+   **步进音序器** - 提供节拍同步时序和模式排序
+
+2. **Pattern Manager** - Manages musical patterns, scales, and instrument timbres
+   **模式管理器** - 管理音乐模式、音阶和乐器音色
+
+3. **Effects Chain** - Processes audio through configurable effect chains
+   **效果链** - 通过可配置的效果链处理音频
+
+4. **Noise Cancellation** - Advanced noise gate with adaptive threshold adjustment
+   **噪音消除** - 具有自适应阈值调整的高级噪声门
+
+5. **Synthesizer Factory** - Creates and manages various synthesizer instruments
+   **合成器工厂** - 创建和管理各种合成器乐器
+
+This architecture ensures high-quality sound with minimal noise while maintaining responsive interactivity.
+
+该架构确保在保持响应式交互的同时提供高质量、低噪音的声音。
 
 ## Contribution Guidelines 贡献指南
 
