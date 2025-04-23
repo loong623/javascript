@@ -170,41 +170,44 @@ class StepSequencer {
                                 
                                 // 为不同的鼓组部件使用适合的参数
                                 if (drumName === 'kick') {
-                                    // 鼓使用特定的音高
-                                    drum.triggerAttackRelease('C1', '32n', safeTime, 0.9);
-                                } else if (drumName === 'snare') {
-                                    // 噪声合成器不需要音高
-                                    drum.triggerAttackRelease('32n', safeTime, 0.8);
-                                } else if (drumName === 'hihat') {
-                                    // 简化高音镲触发逻辑，使用更直接的方式减少低频噪音
+                                    // 优化低音通鼓的触发，增加释放时间使声音更加自然
                                     try {
-                                        // 关键改进：使用更短的音符长度，不做复杂的音量操作
-                                        // 通过直接使用清晰的参数设置而非音量控制来实现干净声音
+                                        // 增加衰减时间以获得更松弛的低音效果
+                                        // 降低音量避免过冲，使声音更加厚实自然
+                                        drum.triggerAttackRelease('C1', '4n', safeTime, 0.8);
                                         
-                                        // 速度参数控制触发强度，降低以减少噪音
-                                        const hihatVelocity = 0.5;
+                                        console.log('触发低音通鼓: C1, 音量: 0.8');
+                                    } catch (kickErr) {
+                                        console.warn('低音通鼓触发失败，使用备选方案:', kickErr);
+                                        drum.triggerAttackRelease('D1', '4n', safeTime, 0.75);
+                                    }
+                                } else if (drumName === 'snare') {
+                                    // 优化军鼓声音，增加释放时间和自然衰减
+                                    drum.triggerAttackRelease('16n', safeTime + 0.01, 0.7);
+                                } else if (drumName === 'hihat') {
+                                    // 重写高音镲触发逻辑，匹配新的NoiseSynth实现
+                                    try {
+                                        // 用更简化的触发方式，无需操作噪声类型和包络
+                                        const hihatTime = safeTime + 0.002; // 最小化延迟避免时序问题
                                         
-                                        // 使用极短的音符长度
-                                        const noteDuration = '128n'; 
+                                        // 固定使用非常短的持续时间和合适的音量
+                                        const hihatDuration = '32n'; 
+                                        const hihatVelocity = 0.4;
                                         
-                                        // 直接触发，通过更简单的参数控制方式获得更干净的声音
-                                        drum.triggerAttackRelease(noteDuration, safeTime, hihatVelocity);
+                                        // 简单直接的触发方式
+                                        drum.triggerAttackRelease(hihatDuration, hihatTime, hihatVelocity);
+                                        
+                                        // 不再需要频繁修改合成器参数，避免造成数字伪影
                                     } catch (err) {
                                         console.warn(`高音镲触发失败: ${err.message}`);
-                                        try {
-                                            // 降级方案 - 极短音符和极低力度
-                                            drum.triggerAttackRelease('128n', safeTime, 0.3);
-                                        } catch (finalErr) {
-                                            console.error('高音镲触发完全失败', finalErr);
-                                        }
                                     }
                                 } else {
-                                    // 其他鼓组部件的默认处理
+                                    // 其他鼓组部件使用更自然的参数
                                     drum.triggerAttackRelease(
                                         typeof note === 'string' ? note : '32n', 
-                                        '32n', 
-                                        safeTime,
-                                        0.7 // 默认音量
+                                        '16n', // 稍长的持续时间
+                                        safeTime + 0.005, // 轻微错开时间
+                                        0.65 // 降低默认音量
                                     );
                                 }
                                 

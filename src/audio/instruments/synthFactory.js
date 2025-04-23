@@ -157,16 +157,16 @@ class SynthFactory {
         try {
             // 为每种鼓声创建一个合成器
             const kick = new Tone.MembraneSynth({
-                pitchDecay: 0.05,   // 更短的音高衰减，使kick更紧凑有力
-                octaves: 5,         // 增加八度范围，使低音更明显
+                pitchDecay: 0.04,   
+                octaves: 6,         
                 oscillator: { type: 'sine' },
                 envelope: {
-                    attack: 0.001,  // 极短的攻击
-                    decay: 0.4,     // 适当增加衰减时间
-                    sustain: 0.01,  // 几乎不持续
-                    release: 1.4    // 更长的释放使低音更自然
+                    attack: 0.0005, 
+                    decay: 0.6,     
+                    sustain: 0.015, 
+                    release: 1.6    
                 },
-                volume: -6          // 稍微提高音量
+                volume: -1          // 提高低音通鼓音量(从-3调整到-1)
             });
             
             const snare = new Tone.NoiseSynth({
@@ -175,40 +175,37 @@ class SynthFactory {
                     playbackRate: 3
                 },
                 envelope: {
-                    attack: 0.001,  // 更短的攻击
-                    decay: 0.13,    // 稍长的衰减
-                    sustain: 0,     // 没有持续音
+                    attack: 0.001,  
+                    decay: 0.13,    
+                    sustain: 0,     
                     release: 0.2
                 },
-                volume: -10         // 略微降低音量
+                volume: -8         // 提高军鼓音量(从-10调整到-8)
             });
             
-            const hihat = new Tone.MetalSynth({
-                frequency: 700,     // 上调频率，避免低频共振
-                harmonicity: 4.0,   // 适当提高谐波比
-                modulationIndex: 32, // 恢复调制指数以保持清脆感
-                envelope: {
-                    attack: 0.003,  // 更短的攻击，减少低频起音部分
-                    decay: 0.025,   // 快速衰减，减少持续时间
-                    sustain: 0,     
-                    release: 0.02   // 更短的释放时间
+            // 使用NoiseSynth代替MetalSynth作为高音镲，更少的数字伪影
+            const hihat = new Tone.NoiseSynth({
+                noise: { 
+                    type: 'white',    
+                    playbackRate: 5,  
                 },
-                volume: -25,        // 比之前稍高一点，但仍控制在安全范围
-                resonance: 4000,    // 提高共振频率，突出高频部分
-                octaves: 1.2,       // 适当的八度范围
+                envelope: {
+                    attack: 0.0005,    
+                    decay: 0.03,       
+                    sustain: 0,        
+                    release: 0.03      
+                },
+                volume: -25,           // 降低高音镲音量(从-20调整到-25)
                 
-                // 滤波器参数更平衡
-                filterEnvelope: {
-                    attack: 0.001,
-                    decay: 0.02,
-                    sustain: 0,
-                    release: 0.015,
-                    baseFrequency: 2000,  // 提高基础频率，避开低频范围
-                    octaves: -0.5         // 较轻微地抑制高频成分
-                }
+                // 添加高通滤波，去除所有低频成分
+                filter: {
+                    type: 'highpass',
+                    frequency: 7000,   
+                    Q: 1.2
+                },
             });
             
-            console.log("创建鼓组...");
+            console.log("调整鼓组音量：低音通鼓音量-1dB，军鼓音量-8dB，高音镲音量-25dB");
             
             // 将所有鼓组合成器放入对象并返回
             return this._storeSynth('drumKit', { kick, snare, hihat });
@@ -217,7 +214,7 @@ class SynthFactory {
             
             // 返回一个简单的备用鼓组
             const fallbackKit = {
-                kick: new Tone.MembraneSynth({ volume: -12 }),
+                kick: new Tone.MembraneSynth({ volume: -6 }),
                 snare: new Tone.NoiseSynth({ volume: -14 }),
                 hihat: new Tone.MetalSynth({ volume: -20 })
             };

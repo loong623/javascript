@@ -182,7 +182,6 @@
             <button id="startButton">开始摄像头</button>
             <button id="stopButton">停止摄像头</button>
             <button id="toggleVisualization" class="secondary">切换可视化效果</button>
-            <button id="toggleZones" class="tertiary">切换区域显示</button>
         </div>
         
         <div class="status" id="status">等待启动...</div>
@@ -214,22 +213,6 @@
                     <label for="volume-slider">音量</label>
                     <input type="range" id="volume-slider" min="0" max="100" value="80">
                 </div>
-                
-                <div class="zone-info">
-                    <h4>区域说明</h4>
-                    <div class="zone">
-                        <div class="zone-color left-zone-color"></div>
-                        <div>左侧区域：低音节奏区，产生低沉的节奏音效</div>
-                    </div>
-                    <div class="zone">
-                        <div class="zone-color center-zone-color"></div>
-                        <div>中央区域：正常音效区，标准音效</div>
-                    </div>
-                    <div class="zone">
-                        <div class="zone-color right-zone-color"></div>
-                        <div>右侧区域：高音滑音区，产生滑音效果</div>
-                    </div>
-                </div>
             </div>
             
             <div class="panel">
@@ -256,4 +239,4 @@
     
     <script type="module" src="/src/main.js"></script>
 </body>
-</html> 
+</html>

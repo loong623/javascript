@@ -13,7 +13,6 @@ class Visualizer {
         this.showBoundingBoxes = true;
         this.showMusicInfo = true;
         this.musicVisualization = true;
-        this.showZones = false; // 默认不显示区域，因为已经只有一个统一音区
         
         // Audio visualization properties
         this.particles = [];
@@ -21,9 +20,6 @@ class Visualizer {
         this.lastNoteTime = 0;
         this.lastNote = null;
         this.lastTimbre = null;
-        
-        // 移除音区边界
-        // 整个屏幕现在是一个统一的音区
         
         // 添加视频尺寸监听器
         this._setupVideoSizeObserver();
@@ -135,14 +131,6 @@ class Visualizer {
         // 准备绘制前清空画布
         this.clearCanvas();
         
-        // 绘制视频帧作为背景（可选，通常不需要，因为视频层已在下面）
-        // this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-        
-        // Draw zones if enabled
-        if (this.showZones) {
-            this.drawInteractionZones();
-        }
-        
         // 如果没有预测结果，显示提示
         if (!predictions || predictions.length === 0) {
             // 在屏幕上绘制一个小提示
@@ -214,34 +202,6 @@ class Visualizer {
         if (this.musicVisualization && this.lastNote) {
             this.drawMusicVisualization();
         }
-    }
-    
-    // Draw the left and right interaction zones
-    drawInteractionZones() {
-        const width = this.canvas.width;
-        const height = this.canvas.height;
-        
-        // Left zone (low bass notes)
-        this.ctx.fillStyle = 'rgba(50, 50, 150, 0.2)'; // Blue tint
-        this.ctx.fillRect(0, 0, width * this.leftZoneBoundary, height);
-        
-        // Right zone (high glide notes)
-        this.ctx.fillStyle = 'rgba(150, 50, 50, 0.2)'; // Red tint
-        this.ctx.fillRect(width * this.rightZoneBoundary, 0, width * (1 - this.rightZoneBoundary), height);
-        
-        // Draw zone labels
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.font = '14px Arial';
-        this.ctx.textAlign = 'center';
-        
-        // Left zone label
-        this.ctx.fillText('低音节奏区', width * this.leftZoneBoundary / 2, 30);
-        
-        // Right zone label
-        this.ctx.fillText('高音滑音区', width - (width * (1 - this.rightZoneBoundary) / 2), 30);
-        
-        // Reset text alignment
-        this.ctx.textAlign = 'start';
     }
     
     updateMusicInfo(note, rhythm, timbre) {
@@ -339,11 +299,6 @@ class Visualizer {
     toggleMusicVisualization() {
         this.musicVisualization = !this.musicVisualization;
         return this.musicVisualization;
-    }
-    
-    toggleZones() {
-        this.showZones = !this.showZones;
-        return this.showZones;
     }
     
     /**

@@ -46,9 +46,9 @@ class AudioEngine {
         this.bassLoopCount = 0;    // 用于跟踪低音循环次数
         this.bassLoopThreshold = 2; // 完成几个循环后才切换和弦音
         
-        // 右侧滑音状态
-        this.glideActive = false;
-        this.glideNote = null;
+        // 多物体滑音管理
+        this.objectGlides = new Map(); // 存储每个物体的滑音合成器: { id: { synth, note, lastSeen } }
+        this.objectCleanupInterval = null; // 用于定期检查和清理不再活跃的物体
         
         // 初始化
         this._initInstruments();
@@ -80,7 +80,7 @@ class AudioEngine {
             bass: this.synthFactory.createMonoSynth({
                 oscillator: { type: 'triangle' },
                 envelope: {
-                    attack: 0.05, // 降低攻击时间，让音符更明显
+                    attack: 0.05, // 修复八进制字面量错误(从05改为0.05)
                     decay: 0.4,
                     sustain: 0.6, // 增加持续值
                     release: 1.0  // 减少释放时间，避免音符重叠
@@ -121,11 +121,11 @@ class AudioEngine {
     _initEffects() {
         // 创建主效果链
         const mainEffectsChain = this.effectsChain.createChain({
-            // 低切滤波器 - 去除低频噪音
+            // 低切滤波器 - 去除超低频噪音，降低截止频率以保留更多低音
             lowcut: new Tone.Filter({
                 type: "highpass",
-                frequency: 80,
-                rolloff: -24
+                frequency: 30,  // 降低截止频率(从80Hz降至30Hz)，以保留更多低频内容
+                rolloff: -12    // 减小斜率，使低频截止更平缓
             }),
             
             // 混响效果
@@ -144,10 +144,10 @@ class AudioEngine {
             
             // 增强型噪声门 - 关键组件
             noiseGate: this.noiseUtils.createEnhancedNoiseGate({
-                threshold: -30,
+                threshold: -35,  // 降低阈值，让更多低频信号通过
                 smoothing: 0.1,
                 attack: 0.003,
-                release: 0.1
+                release: 1
             }),
             
             // 动态压缩器 - 平衡响度
@@ -157,6 +157,15 @@ class AudioEngine {
                 attack: 0.003,
                 release: 0.25,
                 knee: 30
+            }),
+            
+            // 均衡器 - 进一步增强低频
+            eq: new Tone.EQ3({
+                low: 5,         // 提升低频 (+5dB, 之前是+2dB)
+                mid: 0,         // 保持中频不变
+                high: -3,       // 降低高频 (-3dB)
+                lowFrequency: 200, // 低频调整范围
+                highFrequency: 3000
             }),
             
             // 主音量控制
@@ -171,9 +180,9 @@ class AudioEngine {
             // 分离的低频高频处理，比单纯的带通滤波器更精准
             lowFilter: new Tone.Filter({
                 type: "lowshelf",
-                frequency: 200,
-                gain: 3,        // 强化低频，使鼓声更清晰
-                Q: 1
+                frequency: 150,  // 降低频率以增强更低音区
+                gain: 6,         // 增加增益(从3dB到6dB)强化低频
+                Q: 0.7           // 降低Q值使频响更平滑
             }),
             
             // 高频滤波器 - 专门处理高音镲噪声
@@ -186,10 +195,10 @@ class AudioEngine {
             
             // 均衡器 - 进一步精细调整频率响应
             eq: new Tone.EQ3({
-                low: 2,         // 提升低频 (+2dB)
+                low: 4,         // 更强力地提升低频(+4dB)
                 mid: 0,         // 保持中频不变
                 high: -3,       // 降低高频 (-3dB)
-                lowFrequency: 300,
+                lowFrequency: 180, // 调整低频范围
                 highFrequency: 3000
             }),
             
@@ -205,8 +214,8 @@ class AudioEngine {
             // 限制器 - 防止信号过载和爆音
             limiter: new Tone.Limiter(-2),
             
-            // 鼓组专用音量控制
-            drumVolume: new Tone.Volume(-8)
+            // 鼓组专用音量控制 - 提高音量
+            drumVolume: new Tone.Volume(-2) // 从-8dB提高到-2dB
         });
         
         // 连接鼓组到专用效果链之前，为高音镲添加专用效果处理
@@ -668,6 +677,9 @@ class AudioEngine {
         this.activeNotes.clear();
         this.isPlaying = false;
         
+        // 释放所有物体滑音
+        this._releaseAllObjectGlides();
+        
         console.log("音频引擎已停止");
     }
 
@@ -995,19 +1007,11 @@ class AudioEngine {
      */
     generateMusic(predictions) {
         if (predictions.length === 0 || !this.isPlaying) {
-            // 如果没有检测到物体但滑音还在播放，则停止滑音
-            if (this.glideActive && this.mainSynths.glide) {
-                console.log("未检测到物体，停止滑音");
-                this.mainSynths.glide.triggerRelease();
-                this.glideActive = false;
-                this.glideNote = null;
+            // 如果没有检测到物体则清理全部滑音
+            if (this.objectGlides.size > 0) {
+                this._releaseAllObjectGlides();
             }
             return null;
-        }
-
-        // 初始化位置跟踪
-        if (!this.lastObjectPosition) {
-            this.lastObjectPosition = {x: 0, y: 0, class: '', timestamp: Date.now()};
         }
 
         try {
@@ -1022,55 +1026,92 @@ class AudioEngine {
                 }
             }
 
-            // 获取第一个检测到的对象
-            const object = predictions[0];
-            const [x, y, width, height] = object.bbox;
+            // 捕获所有被检测到的物体ID，用于后续清理不再检测到的物体
+            const detectedObjectIds = new Set();
             
-            // 获取画布尺寸
-            const canvasWidth = predictions[0].videoWidth || 640;
-            const canvasHeight = predictions[0].videoHeight || 480;
+            // 处理每个检测到的物体
+            for (let i = 0; i < predictions.length; i++) {
+                const object = predictions[i];
+                const [x, y, width, height] = object.bbox;
+                
+                // 创建物体的唯一标识符
+                const objectId = object.id || `${object.class}-${i}`;
+                detectedObjectIds.add(objectId);
+                
+                // 初始化位置跟踪
+                if (!this.lastObjectPositions) {
+                    this.lastObjectPositions = new Map();
+                }
+                
+                // 获取画布尺寸
+                const canvasWidth = object.videoWidth || 640;
+                const canvasHeight = object.videoHeight || 480;
+                
+                // 计算标准化位置 (0-1)
+                const normalizedX = x / canvasWidth;
+                const normalizedY = 1 - (y / canvasHeight); // 反转Y轴，使顶部为高音
+                
+                const now = Date.now();
+                
+                // 获取上次位置，如果存在
+                let moveSpeed = 0;
+                let lastPos = this.lastObjectPositions.get(objectId);
+                
+                if (lastPos) {
+                    // 检测位置变化
+                    const xDiff = Math.abs(normalizedX - lastPos.x);
+                    const yDiff = Math.abs(normalizedY - lastPos.y);
+                    const timeDiff = now - lastPos.timestamp;
+                    
+                    // 计算移动速度 (像素/毫秒)
+                    moveSpeed = Math.sqrt(xDiff * xDiff + yDiff * yDiff) / Math.max(1, timeDiff);
+                }
+                
+                // 存储当前位置用于下次比较
+                this.lastObjectPositions.set(objectId, {
+                    x: normalizedX, 
+                    y: normalizedY,
+                    timestamp: now
+                });
+                
+                // 根据Y坐标映射到音符
+                const note = this.mapToNote(normalizedY);
+                
+                // 为该物体创建或更新滑音播放器
+                this._createOrUpdateObjectGlide(objectId, note, moveSpeed);
+                
+                // 应用动态效果参数调整
+                if (i === 0) { // 仅根据第一个物体调整全局效果
+                    this._dynamicParameterAdjustment(normalizedX, normalizedY);
+                }
+            }
             
-            // 计算标准化位置 (0-1)
-            const normalizedX = x / canvasWidth;
-            const normalizedY = 1 - (y / canvasHeight); // 反转Y轴，使顶部为高音
+            // 清理不再被检测到的物体
+            if (this.objectGlides.size > 0) {
+                for (const objectId of this.objectGlides.keys()) {
+                    if (!detectedObjectIds.has(objectId)) {
+                        this._releaseObjectGlide(objectId);
+                    }
+                }
+            }
             
-            const now = Date.now();
+            // 返回第一个物体的音乐模式（向后兼容）
+            if (predictions.length > 0) {
+                const object = predictions[0];
+                const [x, y] = object.bbox;
+                const canvasWidth = object.videoWidth || 640;
+                const canvasHeight = object.videoHeight || 480;
+                const normalizedX = x / canvasWidth;
+                const normalizedY = 1 - (y / canvasHeight);
+                
+                return {
+                    note: this.mapToNote(normalizedY),
+                    rhythm: '8n',
+                    timbre: this.setTimbre(object.class)
+                };
+            }
             
-            // 检测位置变化
-            const xDiff = Math.abs(normalizedX - this.lastObjectPosition.x);
-            const yDiff = Math.abs(normalizedY - this.lastObjectPosition.y);
-            const timeDiff = now - this.lastObjectPosition.timestamp;
-            
-            // 计算移动速度 (像素/毫秒)
-            const moveSpeed = Math.sqrt(xDiff * xDiff + yDiff * yDiff) / Math.max(1, timeDiff);
-            
-            // 存储当前位置用于下次比较
-            this.lastObjectPosition = {
-                x: normalizedX, 
-                y: normalizedY,
-                class: object.class,
-                timestamp: now
-            };
-            
-            // 根据Y坐标映射到音符，并设置音色
-            const note = this.mapToNote(normalizedY);
-            const timbre = this.setTimbre(object.class);
-            
-            // 创建音乐模式
-            const pattern = {
-                note,
-                rhythm: '8n',
-                timbre,
-                moveSpeed
-            };
-            
-            // 始终使用滑音模式，根据移动速度调整滑音参数
-            this._handleSlideNotes(pattern);
-            
-            // 动态调整效果参数
-            this._dynamicParameterAdjustment(normalizedX, normalizedY);
-            
-            return pattern;
+            return null;
         } catch (err) {
             console.error("生成音乐时出错:", err);
             return null;
@@ -1420,6 +1461,189 @@ class AudioEngine {
             }
         } catch (err) {
             console.error('处理滑音音符时出错:', err);
+        }
+    }
+
+    /**
+     * 为特定物体创建或更新滑音播放器
+     * @param {string} objectId - 物体的唯一标识符
+     * @param {string} note - 要播放的音符
+     * @param {number} moveSpeed - 物体移动速度
+     * @private
+     */
+    _createOrUpdateObjectGlide(objectId, note, moveSpeed) {
+        const now = Tone.now();
+        
+        // 根据移动速度调整滑音时间
+        let portamentoTime;
+        if (moveSpeed > 0.003) { // 快速移动
+            portamentoTime = 0.05; // 非常快的滑音
+        } else if (moveSpeed > 0.001) { // 中速移动
+            portamentoTime = 0.15; // 中等滑音
+        } else { // 慢速移动
+            portamentoTime = 0.3; // 平滑滑音
+        }
+        
+        // 检查物体滑音是否已存在
+        if (this.objectGlides.has(objectId)) {
+            // 更新现有滑音
+            const glideData = this.objectGlides.get(objectId);
+            
+            // 更新最后一次使用时间
+            glideData.lastSeen = Date.now();
+            
+            // 如果音符发生变化，更新滑音
+            if (glideData.note !== note) {
+                try {
+                    if (glideData.synth && typeof glideData.synth.setNote === 'function') {
+                        // 设置新的滑音时间
+                        glideData.synth.set({ "portamento": portamentoTime });
+                        
+                        // 平滑过渡到新音符
+                        glideData.synth.setNote(note, now);
+                        console.log(`物体 ${objectId} 滑音过渡: ${glideData.note} -> ${note}, 速度: ${moveSpeed.toFixed(5)}`);
+                        
+                        // 更新音符
+                        glideData.note = note;
+                    }
+                } catch (err) {
+                    console.error(`更新物体 ${objectId} 滑音时出错:`, err);
+                }
+            }
+        } else {
+            // 创建新的滑音合成器
+            try {
+                console.log(`为物体 ${objectId} 创建新的滑音合成器, 初始音符: ${note}`);
+                
+                // 创建新的滑音合成器，基于主滑音合成器的设置
+                const objectSynth = this.synthFactory.createMonoSynth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: {
+                        attack: 0.03,
+                        decay: 0.2,
+                        sustain: 0.8,
+                        release: 1.0
+                    },
+                    portamento: portamentoTime,
+                    volume: -12
+                });
+                
+                // 连接到主效果链
+                if (this.mainEffectsChain) {
+                    objectSynth.connect(this.mainEffectsChain.lowcut);
+                } else {
+                    objectSynth.toDestination();
+                }
+                
+                // 触发滑音
+                objectSynth.triggerAttack(note, now);
+                
+                // 存储滑音数据
+                this.objectGlides.set(objectId, {
+                    synth: objectSynth,
+                    note: note,
+                    lastSeen: Date.now()
+                });
+                
+                // 如果这是第一个物体，启动清理定时器
+                if (this.objectGlides.size === 1 && !this.objectCleanupInterval) {
+                    this._startObjectCleanupInterval();
+                }
+            } catch (err) {
+                console.error(`为物体 ${objectId} 创建滑音合成器时出错:`, err);
+            }
+        }
+    }
+
+    /**
+     * 释放特定物体的滑音播放器
+     * @param {string} objectId - 物体的唯一标识符
+     * @private
+     */
+    _releaseObjectGlide(objectId) {
+        if (this.objectGlides.has(objectId)) {
+            try {
+                const glideData = this.objectGlides.get(objectId);
+                
+                console.log(`释放物体 ${objectId} 的滑音播放器`);
+                
+                // 释放合成器
+                if (glideData.synth) {
+                    // 先触发释放
+                    glideData.synth.triggerRelease();
+                    
+                    // 短暂延迟后断开连接和清理资源
+                    setTimeout(() => {
+                        if (glideData.synth) {
+                            try {
+                                // 断开连接
+                                glideData.synth.disconnect();
+                                
+                                // 处置合成器
+                                if (typeof glideData.synth.dispose === 'function') {
+                                    glideData.synth.dispose();
+                                }
+                            } catch (err) {
+                                console.warn(`清理物体 ${objectId} 滑音资源时出错:`, err);
+                            }
+                        }
+                    }, 1000); // 1秒后清理，确保释放完成
+                }
+                
+                // 从Map中移除
+                this.objectGlides.delete(objectId);
+                
+                // 如果没有物体了，清除定时器
+                if (this.objectGlides.size === 0 && this.objectCleanupInterval) {
+                    clearInterval(this.objectCleanupInterval);
+                    this.objectCleanupInterval = null;
+                }
+            } catch (err) {
+                console.error(`释放物体 ${objectId} 滑音时出错:`, err);
+            }
+        }
+    }
+
+    /**
+     * 启动清理定时器，处理消失的物体
+     * @private
+     */
+    _startObjectCleanupInterval() {
+        // 每5秒检查一次不活跃的物体
+        this.objectCleanupInterval = setInterval(() => {
+            const now = Date.now();
+            const inactiveThreshold = 2000; // 2秒不活跃视为消失
+            
+            // 检查每个物体
+            for (const [objectId, glideData] of this.objectGlides.entries()) {
+                // 如果物体超过阈值未被更新，则释放其资源
+                if (now - glideData.lastSeen > inactiveThreshold) {
+                    console.log(`物体 ${objectId} 超过 ${inactiveThreshold}ms 未更新，释放其滑音资源`);
+                    this._releaseObjectGlide(objectId);
+                }
+            }
+        }, 5000);
+    }
+
+    /**
+     * 停止音频引擎时释放所有物体滑音
+     * @private
+     */
+    _releaseAllObjectGlides() {
+        console.log(`释放所有物体滑音资源 (${this.objectGlides.size} 个)`);
+        
+        // 复制键列表，避免在迭代过程中修改集合
+        const objectIds = Array.from(this.objectGlides.keys());
+        
+        // 释放每个物体的滑音
+        objectIds.forEach(objectId => {
+            this._releaseObjectGlide(objectId);
+        });
+        
+        // 清理定时器
+        if (this.objectCleanupInterval) {
+            clearInterval(this.objectCleanupInterval);
+            this.objectCleanupInterval = null;
         }
     }
 }

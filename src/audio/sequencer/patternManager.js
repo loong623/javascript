@@ -85,7 +85,32 @@ class PatternManager {
      * @returns {Object} 音阶对象
      */
     getScales() {
-        return { ...this.scales };
+        return {
+            // 音域范围调整为A2-C5，以获得更平衡的音域
+            major: [
+                   'A2', 'B2', 
+                   'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3', 
+                   'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4',
+                   'C5'], 
+            
+            minor: [
+                   'A2', 'B2', 
+                   'C3', 'D3', 'Eb3', 'F3', 'G3', 'Ab3', 'Bb3',
+                   'C4', 'D4', 'Eb4', 'F4', 'G4', 'Ab4', 'Bb4',
+                   'C5'], 
+            
+            pentatonic: [
+                        'A2', 'B2',
+                        'C3', 'D3', 'E3', 'G3', 'A3',
+                        'C4', 'D4', 'E4', 'G4', 'A4',
+                        'C5'], 
+            
+            blues: [
+                   'A2', 'Bb2',
+                   'C3', 'Eb3', 'F3', 'Gb3', 'G3', 'Bb3',
+                   'C4', 'Eb4', 'F4', 'Gb4', 'G4', 'Bb4',
+                   'C5'] 
+        };
     }
     
     /**

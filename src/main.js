@@ -12,7 +12,6 @@ const startButton = document.getElementById('startButton');
 const stopButton = document.getElementById('stopButton');
 const statusEl = document.getElementById('status');
 const toggleVisualizationBtn = document.getElementById('toggleVisualization');
-const toggleZonesBtn = document.getElementById('toggleZones');
 const volumeSlider = document.getElementById('volume-slider');
 
 // Create instances of our modules
@@ -71,10 +70,6 @@ function setupEventListeners() {
     
     if (toggleVisualizationBtn) {
         toggleVisualizationBtn.addEventListener('click', toggleVisualization);
-    }
-
-    if (toggleZonesBtn) {
-        toggleZonesBtn.addEventListener('click', toggleZones);
     }
     
     if (volumeSlider) {
@@ -345,12 +340,6 @@ async function detectObjects() {
 function toggleVisualization() {
     const isEnabled = visualizer.toggleMusicVisualization();
     updateStatus(`音乐可视化效果已${isEnabled ? '启用' : '禁用'}`);
-}
-
-// Toggle zones display
-function toggleZones() {
-    const isEnabled = visualizer.toggleZones();
-    updateStatus(`区域显示已${isEnabled ? '启用' : '禁用'}`);
 }
 
 // Handle volume change

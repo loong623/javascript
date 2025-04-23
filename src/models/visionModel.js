@@ -163,8 +163,7 @@ class VisionModel {
                  error.message.includes('WebGL') || 
                  error.message.includes('GPU'))) {
                 try {
-                    // 尝试清理TensorFlow资源
-                    tf.engine().startScope();
+                    // 尝试清理TensorFlow资源（使用更简洁的方法）
                     tf.engine().endScope();
                     tf.engine().purgeLocalWebGLMemory();
                     console.log('已清理TensorFlow内存资源');
