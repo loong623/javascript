@@ -25,7 +25,7 @@ const visualizer = new Visualizer(video, canvas);
 let isRunning = false;
 let animationId;
 let lastMusicGenerationTime = 0;
-const MUSIC_GENERATION_INTERVAL = 200; // Minimum time between music generations in ms
+const MUSIC_GENERATION_INTERVAL = 80; // 降低为80ms，使音符能更频繁响起
 
 // Initialize the application
 async function initApp() {
@@ -107,15 +107,42 @@ async function startCamera() {
 
         // 确保使用用户交互来启动音频上下文
         try {
+            // 先检查音频上下文的当前状态
+            console.log('初始音频上下文状态:', Tone.context.state);
+            
+            // 强制恢复音频上下文，解决可能的"suspended"状态问题
+            if (Tone.context.state === "suspended") {
+                await Tone.context.resume();
+            }
+            
             // 使用较长的超时以确保音频上下文有时间完成初始化
             await Tone.start();
-            console.log('Tone.js 音频上下文状态:', Tone.context.state);
+            console.log('Tone.js 音频上下文状态(start后):', Tone.context.state);
+            
+            // 确认音频上下文已启动
+            if (Tone.context.state !== "running") {
+                console.warn('音频上下文仍未运行，尝试强制激活...');
+                // 第二次尝试激活音频上下文
+                await Tone.context.resume();
+                console.log('再次尝试后音频上下文状态:', Tone.context.state);
+            }
+            
+            // 设置全局音量到一个确保可听的级别
+            Tone.getDestination().volume.value = -10;
+            console.log('全局音量已设置为:', Tone.getDestination().volume.value, 'dB');
             
             // 播放测试音以确保音频系统工作
             await testAudio();
             
-            // 启动音频引擎
+            // 启动音频引擎 - 确保等待完成
             await audioEngine.start();
+            
+            // 验证音频引擎状态
+            console.log('音频引擎状态:', {
+                isPlaying: audioEngine.isPlaying, 
+                contextStarted: audioEngine.contextStarted,
+                transportState: Tone.Transport.state
+            });
         } catch (audioErr) {
             console.error('音频初始化错误:', audioErr);
             updateStatus('音频初始化出错: ' + audioErr.message + '。声音可能不可用。');

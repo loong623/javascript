@@ -33,6 +33,23 @@ class AudioEngine {
         this.activeNotes = new Set();
         this.lastBeatTime = 0;
         
+        // 统一使用一种节奏模式 10010010
+        this.rhythmPattern = [1, 0, 0, 1, 0, 0, 1, 0];
+        this.rhythmStep = 0;
+        this.lastObjectNoteInfo = null; // 存储上一个物体生成的音符信息
+        
+        // 左侧区域1645和弦进行
+        this.bassChordProgression = ['C2', 'A1', 'F1', 'G1']; // 1-6-4-5和弦根音
+        this.bassChordIndex = 0;
+        this.bassSequenceActive = false;
+        this.lastBassTime = 0;
+        this.bassLoopCount = 0;    // 用于跟踪低音循环次数
+        this.bassLoopThreshold = 2; // 完成几个循环后才切换和弦音
+        
+        // 右侧滑音状态
+        this.glideActive = false;
+        this.glideNote = null;
+        
         // 初始化
         this._initInstruments();
         this._initEffects();
@@ -59,37 +76,37 @@ class AudioEngine {
                 volume: -10
             }),
             
-            // 低音合成器 - 左侧区域使用
+            // 低音合成器 - 用于低音和弦进行
             bass: this.synthFactory.createMonoSynth({
                 oscillator: { type: 'triangle' },
                 envelope: {
-                    attack: 0.1,
-                    decay: 0.3,
-                    sustain: 0.5,
-                    release: 1.5
+                    attack: 0.05, // 降低攻击时间，让音符更明显
+                    decay: 0.4,
+                    sustain: 0.6, // 增加持续值
+                    release: 1.0  // 减少释放时间，避免音符重叠
                 },
                 filterEnvelope: {
-                    attack: 0.05,
+                    attack: 0.02,
                     decay: 0.5,
-                    sustain: 0.3,
-                    release: 2,
-                    baseFrequency: 200,
-                    octaves: 2.5
+                    sustain: 0.5, // 增加滤波器包络的持续度
+                    release: 1.5,
+                    baseFrequency: 250, // 增加基频以增强清晰度
+                    octaves: 2.0
                 },
-                volume: -12
+                volume: -2  // 显著提高低音区音量，使后两个音更清晰
             }),
             
-            // 滑音合成器 - 右侧区域使用
+            // 滑音合成器 - 用于物品移动时
             glide: this.synthFactory.createMonoSynth({
                 oscillator: { type: 'sawtooth' },
                 envelope: {
-                    attack: 0.05,
+                    attack: 0.03,
                     decay: 0.2,
                     sustain: 0.8,
-                    release: 2
+                    release: 1.0
                 },
-                portamento: 0.2,
-                volume: -15
+                portamento: 0.15, // 降低滑音时间使其更响应
+                volume: -12  // 调整滑音区音量
             })
         };
         
@@ -149,11 +166,120 @@ class AudioEngine {
         // 连接合成器到效果链
         this.effectsChain.connectInstruments(this.mainSynths, mainEffectsChain);
         
-        // 将所有效果发送到输出
+        // 创建专用鼓组效果链，更简单且处理针对鼓组特性的问题
+        const drumEffectsChain = this.effectsChain.createChain({
+            // 分离的低频高频处理，比单纯的带通滤波器更精准
+            lowFilter: new Tone.Filter({
+                type: "lowshelf",
+                frequency: 200,
+                gain: 3,        // 强化低频，使鼓声更清晰
+                Q: 1
+            }),
+            
+            // 高频滤波器 - 专门处理高音镲噪声
+            highFilter: new Tone.Filter({
+                type: "highshelf",
+                frequency: 5000,
+                gain: -6,       // 降低高频增益，减少噪声
+                Q: 0.5
+            }),
+            
+            // 均衡器 - 进一步精细调整频率响应
+            eq: new Tone.EQ3({
+                low: 2,         // 提升低频 (+2dB)
+                mid: 0,         // 保持中频不变
+                high: -3,       // 降低高频 (-3dB)
+                lowFrequency: 300,
+                highFrequency: 3000
+            }),
+            
+            // 动态压缩器 - 控制鼓声动态范围，减少爆音
+            compressor: new Tone.Compressor({
+                threshold: -24,
+                ratio: 4,
+                attack: 0.002,  // 更快的攻击，迅速控制瞬态
+                release: 0.15,
+                knee: 5
+            }),
+            
+            // 限制器 - 防止信号过载和爆音
+            limiter: new Tone.Limiter(-2),
+            
+            // 鼓组专用音量控制
+            drumVolume: new Tone.Volume(-8)
+        });
+        
+        // 连接鼓组到专用效果链之前，为高音镲添加专用效果处理
+        if (this.drumKit && this.drumKit.hihat) {
+            console.log("配置高音镲专用效果链...");
+            
+            try {
+                // 断开高音镲与之前的连接
+                this.drumKit.hihat.disconnect();
+                
+                // 创建高音镲专用效果链 - 简化处理以解决低频"咳吃"噪音
+                const hihatEffectsChain = this.effectsChain.createChain({
+                    // 高通滤波器 - 移除低频噪音，提高频率以消除"咳吃"噪音
+                    highpass: new Tone.Filter({
+                        type: "highpass",
+                        frequency: 3000, // 降低频率，避免过于尖锐的噪音
+                        rolloff: -24,    // 增加滚降率以更有效过滤低频
+                        Q: 0.8           // 降低Q值，减少共振效应
+                    }),
+                    
+                    // 调整限制器阈值
+                    limiter: new Tone.Limiter(-8),
+                    
+                    // 移除可能引起问题的淡入效果
+                    // 使用简单增益代替复杂音量控制
+                    output: new Tone.Gain(0.3) // 降低增益进一步减少噪音
+                });
+                
+                // 连接高音镲到其专用效果链，然后连接到鼓组效果链
+                this.drumKit.hihat.connect(hihatEffectsChain.highpass);
+                hihatEffectsChain.output.connect(this.drumEffectsChain.lowFilter);
+                
+                // 存储引用以便后续使用
+                this.hihatEffectsChain = hihatEffectsChain;
+            } catch (err) {
+                console.error('配置高音镲效果链失败:', err);
+                // 如果专用效果链失败，回退到直接连接到鼓效果链
+                try {
+                    this.drumKit.hihat.disconnect();
+                    this.drumKit.hihat.connect(this.drumEffectsChain.lowFilter);
+                } catch (fallbackErr) {
+                    console.error('高音镲回退连接也失败:', fallbackErr);
+                }
+            }
+        }
+        
+        // 确保在连接前所有鼓组部件已断开与任何其他节点的连接
+        if (this.drumKit) {
+            console.log("连接鼓组到专用效果链...");
+            Object.values(this.drumKit).forEach(drum => {
+                if (drum && typeof drum.disconnect === 'function') {
+                    try {
+                        // 断开任何现有连接
+                        drum.disconnect();
+                    } catch (err) {
+                        // 忽略断开错误
+                    }
+                }
+            });
+            
+            // 现在安全地连接到鼓效果链
+            this.effectsChain.connectInstruments(this.drumKit, drumEffectsChain);
+        }
+        
+        // 将鼓效果链连接到主输出
+        drumEffectsChain.drumVolume.connect(Tone.getDestination());
+        
+        // 将主效果链连接到输出
         mainEffectsChain.masterVolume.toDestination();
         
         // 存储引用以便后续使用
         this.mainEffectsChain = mainEffectsChain;
+        this.drumEffectsChain = drumEffectsChain;
     }
 
     /**
@@ -335,16 +461,142 @@ class AudioEngine {
      */
     _startSequencer() {
         // 停止任何现有序列
+        console.log("重置并启动音序器...");
         this.sequencer.stopAll();
         
-        // 获取当前鼓点模式
-        const drumPattern = this.drumPatterns[this.currentRhythmPattern];
+        try {
+            // 确保传输已启动
+            if (Transport.state !== 'started') {
+                Transport.start('+0.1');
+            }
+            
+            // 获取当前鼓点模式
+            const drumPattern = this.drumPatterns[this.currentRhythmPattern];
+            if (!drumPattern) {
+                console.error(`找不到鼓点模式: ${this.currentRhythmPattern}`);
+                return;
+            }
+            
+            console.log(`使用鼓点模式: ${this.currentRhythmPattern}`, drumPattern);
+            
+            // 确保鼓组已正确初始化
+            if (!this.drumKit) {
+                console.error("鼓组未正确初始化");
+                return;
+            }
+            
+            // 验证鼓组各部分是否存在
+            ['kick', 'snare', 'hihat'].forEach(part => {
+                if (!this.drumKit[part]) {
+                    console.warn(`找不到鼓组部分: ${part}`);
+                }
+            });
+            
+            // 直接测试鼓声是否能正常发出声音
+            try {
+                if (this.drumKit.kick) {
+                    setTimeout(() => {
+                        this.drumKit.kick.triggerAttackRelease('C2', '16n');
+                        console.log("测试鼓声 - kick");
+                    }, 500);
+                }
+                
+                if (this.drumKit.snare) {
+                    setTimeout(() => {
+                        this.drumKit.snare.triggerAttackRelease('16n');
+                        console.log("测试鼓声 - snare");
+                    }, 800);
+                }
+                
+                if (this.drumKit.hihat) {
+                    setTimeout(() => {
+                        this.drumKit.hihat.triggerAttackRelease('16n');
+                        console.log("测试鼓声 - hihat");
+                    }, 1100);
+                }
+            } catch (testErr) {
+                console.error("测试鼓声失败:", testErr);
+            }
+            
+            // 创建并启动鼓序列
+            const drumSequence = this.sequencer.createDrumSequence(this.drumKit, drumPattern);
+            if (!drumSequence) {
+                console.error("无法创建鼓序列");
+                return;
+            }
+            
+            // 启动音序器
+            this.sequencer.start();
+            
+            // 启动低音和弦序列
+            this._startBassChordSequence();
+            
+            console.log(`音序器已启动: ${this.currentRhythmPattern} 模式`);
+        } catch (err) {
+            console.error("启动音序器时出错:", err);
+        }
+    }
+    
+    /**
+     * 启动低音和弦序列 - 用于左侧区域的1645和弦进行
+     * @private
+     */
+    _startBassChordSequence() {
+        if (this.bassSequenceActive) {
+            clearInterval(this.bassSequenceActive);
+        }
         
-        // 创建并启动序列
-        this.sequencer.createDrumSequence(this.drumKit, drumPattern);
-        this.sequencer.start();
+        // 计算两拍的时间间隔（反拍）
+        const beatInterval = 60 / this.bpm;
+        const intervalTime = beatInterval * 1000; // 转为毫秒
         
-        console.log(`启动音序器：${this.currentRhythmPattern} 模式`);
+        // 重置计数器
+        this.bassLoopCount = 0;
+        this.bassChordIndex = 0;
+        
+        console.log(`启动低音和弦序列，间隔: ${intervalTime.toFixed(0)}ms, 使用1645和弦进行, ${this.bassLoopThreshold}个循环后切换音高`);
+        
+        // 创建低音和弦序列
+        this.bassSequenceActive = setInterval(() => {
+            if (!this.isPlaying) return;
+            
+            // 获取当前和弦根音
+            const bassNote = this.bassChordProgression[this.bassChordIndex];
+            
+            // 播放低音和弦根音
+            if (this.mainSynths.bass) {
+                try {
+                    const now = Tone.now();
+                    
+                    // 确保不会过于频繁触发低音
+                    if (now - this.lastBassTime < beatInterval * 0.5) {
+                        return;
+                    }
+                    
+                    this.lastBassTime = now;
+                    
+                    // 先释放前一个音符确保新音符能被听到
+                    this.mainSynths.bass.triggerRelease(now - 0.05);
+                    
+                    // 使用较长的持续时间，确保低音连贯
+                    this.mainSynths.bass.triggerAttackRelease(bassNote, '4n', now, 0.9);
+                    
+                    console.log(`播放低音: ${bassNote}, 当前和弦: ${this.bassChordIndex + 1}/4, 循环计数: ${this.bassLoopCount + 1}/${this.bassLoopThreshold}`);
+                    
+                    // 增加循环计数
+                    this.bassLoopCount++;
+                    
+                    // 完成指定次数循环后才切换到下一个和弦
+                    if (this.bassLoopCount >= this.bassLoopThreshold) {
+                        this.bassChordIndex = (this.bassChordIndex + 1) % this.bassChordProgression.length;
+                        this.bassLoopCount = 0; // 重置循环计数
+                        console.log(`低音切换到下一个和弦: ${this.bassChordProgression[this.bassChordIndex]}`);
+                    }
+                } catch (err) {
+                    console.error('播放低音和弦时出错:', err);
+                }
+            }
+        }, intervalTime);
     }
 
     /**
@@ -359,7 +611,7 @@ class AudioEngine {
             if (destination && destination.volume) {
                 if (typeof destination.volume.rampTo === 'function') {
                     destination.volume.rampTo(-Infinity, 0.3);
-                } else if (typeof destination.volume === 'object') {
+                } else if (destination.volume === 'object') {
                     destination.volume.value = -Infinity;
                 }
             }
@@ -369,6 +621,29 @@ class AudioEngine {
         
         // 停止所有序列
         this.sequencer.stopAll();
+        
+        // 停止低音和弦序列
+        if (this.bassSequenceActive) {
+            clearInterval(this.bassSequenceActive);
+            this.bassSequenceActive = false;
+        }
+        
+        // 停止中央区域节奏
+        if (this.rhythmGenerator) {
+            clearInterval(this.rhythmGenerator);
+            this.rhythmGenerator = null;
+        }
+        
+        // 释放右侧滑音
+        if (this.glideActive && this.mainSynths.glide) {
+            try {
+                this.mainSynths.glide.triggerRelease();
+                this.glideActive = false;
+                this.glideNote = null;
+            } catch (err) {
+                console.warn('释放滑音时出错:', err);
+            }
+        }
         
         // 释放所有音符
         try {
@@ -397,40 +672,168 @@ class AudioEngine {
     }
 
     /**
-     * 播放音符 - 支持精确定时
+     * 播放音符 - 使用防噪音的双阶段触发策略，加强节奏量化
      * @param {string} note - 音符名称
      * @param {string} duration - 音符持续时间
      * @param {boolean} isRightSide - 是否在右侧区域
      * @param {boolean} isLeftSide - 是否在左侧区域
      */
     playNote(note, duration = '8n', isRightSide = false, isLeftSide = false) {
-        if (!this.isPlaying) return;
+        if (!this.isPlaying) {
+            console.warn('尝试播放音符，但音频引擎未运行');
+            return;
+        }
         
-        // 使用Transport时间进行精确定时
-        const now = Transport.seconds;
+        // 确保音符是有效的格式
+        if (!note || typeof note !== 'string') {
+            console.error('无效的音符格式:', note);
+            return;
+        }
         
-        // beat同步 - 防止过于密集的触发
-        if (now - this.lastBeatTime < this.beatInterval * 0.5) return;
+        // 记录详细信息以便调试
+        console.log(`尝试播放音符: ${note}, 持续时间: ${duration}, 右侧: ${isRightSide}, 左侧: ${isLeftSide}`);
+        console.log(`音频上下文状态: ${Tone.context.state}, Transport状态: ${Tone.Transport.state}`);
+        
+        // ===== 节奏控制和节流逻辑 =====
+        // 使用严格的节拍量化和间隔控制
+        const now = Tone.now();
+        
+        // 动态计算节奏间隔 - 确保符合当前节奏模式的脉冲
+        // 使用实际节奏值的持续时间而不是固定值
+        let rhythmInterval = this.beatInterval; // 默认为一拍
+        try {
+            // 将节奏值转换为秒数并用作间隔
+            // 这确保了不同节奏值有不同的间隔时间
+            const durationInSeconds = Tone.Time(duration).toSeconds();
+            rhythmInterval = Math.max(durationInSeconds * 0.8, this.beatInterval * 0.5);
+            
+            // 调试信息
+            console.log(`节奏间隔: ${rhythmInterval.toFixed(3)}秒，节奏值: ${duration}`);
+        } catch (err) {
+            console.warn('计算节奏间隔时出错，使用默认值:', err);
+        }
+        
+        // 使用基于节奏类型的间隔
+        if (now - this.lastBeatTime < rhythmInterval) {
+            console.log('节奏间隔控制: 跳过过于频繁的音符触发');
+            return;
+        }
         this.lastBeatTime = now;
         
-        // 防止重复音符
-        if (this.activeNotes.has(note)) return;
-        this.activeNotes.add(note);
+        // 防止重复音符 - 使用音符+区域作为标识符
+        const noteId = `${note}-${isRightSide ? 'right' : (isLeftSide ? 'left' : 'center')}`;
+        if (this.activeNotes.has(noteId)) {
+            console.log('防重复: 跳过已激活的音符', noteId);
+            return;
+        }
+        this.activeNotes.add(noteId);
         
+        // ===== 合成器选择 =====
         // 选择合适的合成器
-        const synth = isRightSide ? this.mainSynths.glide : 
-                     isLeftSide ? this.mainSynths.bass : 
-                     this.mainSynths.main;
+        let synth;
+        try {
+            if (isRightSide) {
+                // 右侧区域 - 滑音合成器
+                synth = this.mainSynths.glide;
+            } else if (isLeftSide) {
+                // 左侧区域 - 低音合成器
+                synth = this.mainSynths.bass;
+            } else {
+                // 中央区域 - 主合成器
+                synth = this.mainSynths.main;
+            }
+            
+            if (!synth) {
+                console.error('无法获取有效的合成器');
+                this.activeNotes.delete(noteId);
+                return;
+            } else {
+                // 确保合成器已连接到输出
+                if (!synth.connected) {
+                    console.warn('合成器未连接，尝试重新连接到主输出');
+                    synth.toDestination();
+                }
+            }
+        } catch (err) {
+            console.error('选择合成器时发生错误:', err);
+            this.activeNotes.delete(noteId);
+            return;
+        }
         
-        // 使用量化时间播放音符
-        const quantizedTime = Transport.quantize('16n');
-        synth.triggerAttackRelease(note, duration, quantizedTime);
-        
-        // 在适当的时间从活动音符中移除
-        const durationSeconds = Tone.Time(duration).toSeconds();
-        setTimeout(() => {
-            this.activeNotes.delete(note);
-        }, durationSeconds * 1000);
+        // ===== 音符触发准备 =====
+        try {
+            // 确保音频上下文处于活动状态
+            if (Tone.context.state !== "running") {
+                console.warn('音频上下文未运行，尝试恢复...');
+                Tone.context.resume();
+            }
+            
+            // 增加随机偏移量，避免完全同步触发多个音符
+            const randomOffset = (Math.random() * 0.02) - 0.01; // ±10ms随机偏移
+            
+            // 严格量化到节拍网格 - 关键改进
+            // 使用当前节奏模式对应的量化细分
+            let quantizeValue = '16n'; // 默认量化到16分音符
+            
+            // 根据当前节奏模式调整量化精度
+            switch (this.currentRhythmPattern) {
+                case 'techno':
+                    quantizeValue = '16n';
+                    break;
+                case 'jazz':
+                    quantizeValue = '8t'; // 三连音八分音符
+                    break;
+                case 'latin':
+                    quantizeValue = '16n';
+                    break;
+                default: // 'basic'或其他
+                    quantizeValue = '8n';
+            }
+            
+            // 检查Transport是否运行，如果没有则启动它
+            if (Tone.Transport.state !== "started") {
+                console.log('Transport未运行，启动中...');
+                Tone.Transport.start();
+            }
+            
+            // 直接计划下一个时间点而不是使用量化，以确保音符播放
+            const scheduleTime = now + 0.05 + randomOffset;
+            console.log(`计划播放时间: ${scheduleTime.toFixed(3)}`);
+            
+            // 转换音符持续时间为秒
+            const durationSeconds = Tone.Time(duration).toSeconds();
+            
+            // 获取当前音量并备份
+            let originalVolume = -15; // 默认安全值
+            try {
+                if (synth.volume && typeof synth.volume.value === 'number') {
+                    originalVolume = synth.volume.value;
+                }
+            } catch(e) {
+                console.warn('获取合成器音量失败，使用默认值');
+            }
+            
+            // 尝试直接播放声音 - 用于调试
+            console.log('直接尝试播放声音以确认音频系统工作...');
+            const testVolume = originalVolume; // 使用当前音量
+            
+            // 直接触发合成器
+            synth.triggerAttackRelease(note, durationSeconds, scheduleTime, 0.7);
+            
+            // 确保音符播放后的清理
+            const cleanupTime = scheduleTime + durationSeconds + 0.1; // 增加缓冲时间
+            Tone.Transport.scheduleOnce(() => {
+                this.activeNotes.delete(noteId);
+                console.log(`释放音符: ${noteId} 于 ${cleanupTime.toFixed(3)}`);
+            }, cleanupTime);
+            
+            // 记录调试信息
+            console.log(`播放音符: ${note}, 节奏: ${duration}, 区域: ${isRightSide ? '右' : (isLeftSide ? '左' : '中')}`);
+            
+        } catch (err) {
+            console.error('播放音符时出错:', err);
+            this.activeNotes.delete(noteId);
+        }
     }
 
     /**
@@ -451,21 +854,137 @@ class AudioEngine {
     }
 
     /**
-     * 创建基于对象位置的模式
+     * 创建基于对象位置的模式 - 增强版
      * @param {number} x - 标准化X坐标 (0-1)
      * @param {number} y - 标准化Y坐标 (0-1)
      * @param {string} objectClass - 对象类名
      * @returns {Object} 音乐模式描述
      */
     createPattern(x, y, objectClass) {
-        const note = this.mapToNote(y);
+        // 基本参数映射
+        const baseNote = this.mapToNote(y);
         const rhythm = this.mapToRhythm(x);
         const timbre = this.setTimbre(objectClass);
         
-        // 确定在左侧还是右侧区域
+        // 区域划分 - 更细致的划分以提高音乐变化
         const isRightSide = x > 0.7;
         const isLeftSide = x < 0.3;
+        const isCenterLow = x >= 0.3 && x <= 0.5;  // 中央偏左区域
+        const isCenterHigh = x > 0.5 && x <= 0.7;  // 中央偏右区域
         
+        // 初始默认音符
+        let note = baseNote;
+        
+        // ===== 区域特殊音乐处理 =====
+        
+        // 为中间区域增加和弦和旋律变化
+        if (!isLeftSide && !isRightSide) {
+            // 获取音符在当前音阶中的索引
+            const scale = this.scales[this.currentScale];
+            const noteIndex = scale.indexOf(baseNote);
+            
+            if (noteIndex !== -1) {
+                // 添加和弦变化
+                const now = Tone.now();
+                
+                // 每两秒变更一次音乐模式，避免单调
+                const patternSeed = Math.floor(now / 2) % 4;
+                
+                if (isCenterLow) {
+                    // 中央偏左区域 - 加入部分低音和和弦效果
+                    switch (patternSeed) {
+                        case 0:
+                            // 原音符
+                            break;
+                        case 1: 
+                            // 低一个八度
+                            const lowerOctave = baseNote.replace(/(\d+)$/, (match) => {
+                                const octave = parseInt(match);
+                                return Math.max(2, octave - 1);
+                            });
+                            note = lowerOctave;
+                            break;
+                        case 2:
+                            // 三度音
+                            if (noteIndex + 2 < scale.length) {
+                                note = scale[noteIndex + 2];
+                            }
+                            break;
+                        case 3:
+                            // 五度音
+                            if (noteIndex + 4 < scale.length) {
+                                note = scale[noteIndex + 4];
+                            }
+                            break;
+                    }
+                } 
+                else if (isCenterHigh) {
+                    // 中央偏右区域 - 加入部分高音和装饰音效果
+                    switch (patternSeed) {
+                        case 0:
+                            // 原音符
+                            break;
+                        case 1:
+                            // 高八度
+                            const higherOctave = baseNote.replace(/(\d+)$/, (match) => {
+                                const octave = parseInt(match);
+                                return Math.min(6, octave + 1);
+                            });
+                            note = higherOctave;
+                            break;
+                        case 2:
+                            // 增加二度音
+                            if (noteIndex + 1 < scale.length) {
+                                note = scale[noteIndex + 1];
+                            }
+                            break;
+                        case 3:
+                            // 七度音(如果存在)
+                            if (noteIndex + 6 < scale.length) {
+                                note = scale[noteIndex + 6];
+                            }
+                            break;
+                    }
+                }
+                
+                // 使用时间因素改变节奏模式，避免过于规律
+                // 每3.5秒变更一次节奏型
+                const rhythmMod = Math.floor(now / 3.5) % 3;
+                let rhythmAdjust = rhythm;
+                
+                // 根据位置和时间添加节奏变化
+                if ((isCenterLow && rhythmMod === 1) || (isCenterHigh && rhythmMod === 2)) {
+                    // 转换为附点音符以增加节奏变化
+                    if (rhythm === '8n') {
+                        rhythmAdjust = '8n.';
+                    } else if (rhythm === '4n') {
+                        rhythmAdjust = '4n.';
+                    }
+                }
+                
+                // 有10%概率添加断奏效果
+                if (Math.random() < 0.1) {
+                    // 缩短音符长度，模拟断奏
+                    if (rhythm === '4n') {
+                        rhythmAdjust = '8n';
+                    } else if (rhythm === '2n') {
+                        rhythmAdjust = '4n';
+                    }
+                }
+                
+                return {
+                    note,
+                    rhythm: rhythmAdjust,
+                    timbre,
+                    isRightSide,
+                    isLeftSide,
+                    isCenterLow,
+                    isCenterHigh
+                };
+            }
+        }
+        
+        // 默认返回基本模式
         return { note, rhythm, timbre, isRightSide, isLeftSide };
     }
 
@@ -476,7 +995,19 @@ class AudioEngine {
      */
     generateMusic(predictions) {
         if (predictions.length === 0 || !this.isPlaying) {
+            // 如果没有检测到物体但滑音还在播放，则停止滑音
+            if (this.glideActive && this.mainSynths.glide) {
+                console.log("未检测到物体，停止滑音");
+                this.mainSynths.glide.triggerRelease();
+                this.glideActive = false;
+                this.glideNote = null;
+            }
             return null;
+        }
+
+        // 初始化位置跟踪
+        if (!this.lastObjectPosition) {
+            this.lastObjectPosition = {x: 0, y: 0, class: '', timestamp: Date.now()};
         }
 
         try {
@@ -503,42 +1034,40 @@ class AudioEngine {
             const normalizedX = x / canvasWidth;
             const normalizedY = 1 - (y / canvasHeight); // 反转Y轴，使顶部为高音
             
+            const now = Date.now();
+            
+            // 检测位置变化
+            const xDiff = Math.abs(normalizedX - this.lastObjectPosition.x);
+            const yDiff = Math.abs(normalizedY - this.lastObjectPosition.y);
+            const timeDiff = now - this.lastObjectPosition.timestamp;
+            
+            // 计算移动速度 (像素/毫秒)
+            const moveSpeed = Math.sqrt(xDiff * xDiff + yDiff * yDiff) / Math.max(1, timeDiff);
+            
+            // 存储当前位置用于下次比较
+            this.lastObjectPosition = {
+                x: normalizedX, 
+                y: normalizedY,
+                class: object.class,
+                timestamp: now
+            };
+            
+            // 根据Y坐标映射到音符，并设置音色
+            const note = this.mapToNote(normalizedY);
+            const timbre = this.setTimbre(object.class);
+            
             // 创建音乐模式
-            const pattern = this.createPattern(normalizedX, normalizedY, object.class);
+            const pattern = {
+                note,
+                rhythm: '8n',
+                timbre,
+                moveSpeed
+            };
             
-            // 记录详细音乐信息以帮助调试
-            console.log("生成音乐:", {
-                object: object.class,
-                position: { x: normalizedX, y: normalizedY },
-                note: pattern.note,
-                rhythm: pattern.rhythm,
-                timbre: pattern.timbre,
-                zone: pattern.isLeftSide ? "左" : (pattern.isRightSide ? "右" : "中")
-            });
+            // 始终使用滑音模式，根据移动速度调整滑音参数
+            this._handleSlideNotes(pattern);
             
-            // 确保主合成器已连接到输出
-            if (this.mainSynths && this.mainSynths.main) {
-                // 直接播放一个音符以测试声音
-                const synth = pattern.isRightSide ? this.mainSynths.glide : 
-                             pattern.isLeftSide ? this.mainSynths.bass : 
-                             this.mainSynths.main;
-                
-                // 使用当前时间播放而不是量化，确保音符播放
-                try {
-                    synth.triggerAttackRelease(pattern.note, pattern.rhythm, "+0.05");
-                    console.log(`播放音符: ${pattern.note}, 节奏: ${pattern.rhythm}`);
-                } catch (noteErr) {
-                    console.error("播放音符出错:", noteErr);
-                }
-            }
-            
-            // 超过阈值的声音强度触发噪声抑制
-            const intensity = Math.random() * 0.3 + 0.7; // 模拟声音强度
-            if (intensity > 0.8 && this.mainEffectsChain && this.mainEffectsChain.noiseGate) {
-                this.noiseUtils.handlePeakSignal(this.mainEffectsChain.noiseGate, intensity);
-            }
-            
-            // 动态调整部分参数以适应场景
+            // 动态调整效果参数
             this._dynamicParameterAdjustment(normalizedX, normalizedY);
             
             return pattern;
@@ -607,8 +1136,37 @@ class AudioEngine {
      */
     mapToRhythm(x) {
         const rhythms = this.rhythmPatterns[this.currentRhythmPattern];
-        const index = Math.floor(x * rhythms.length);
-        return rhythms[Math.min(index, rhythms.length - 1)];
+        if (!rhythms || !Array.isArray(rhythms) || rhythms.length === 0) {
+            console.warn(`找不到有效的节奏模式: ${this.currentRhythmPattern}，使用默认节奏`);
+            return '8n'; // 默认安全值
+        }
+        
+        // 确保参数有效
+        const safeX = Math.max(0, Math.min(1, isNaN(x) ? 0.5 : x));
+        
+        // 改进的映射算法 - 平滑分布确保更自然的选择
+        // 基于区域添加偏好，确保各区域节奏特征
+        let index;
+        if (safeX < 0.3) {
+            // 左侧区域倾向于使用较短的节奏值（偏移向数组前部）
+            index = Math.floor(safeX / 0.3 * (rhythms.length / 3));
+        } else if (safeX > 0.7) {
+            // 右侧区域倾向于使用较长的节奏值（偏移向数组后部）
+            const rightPosition = (safeX - 0.7) / 0.3;
+            index = Math.floor((rhythms.length / 3) * 2 + rightPosition * (rhythms.length / 3));
+        } else {
+            // 中间区域在中部范围选择节奏值（平衡分布）
+            const centerPosition = (safeX - 0.3) / 0.4;
+            index = Math.floor((rhythms.length / 3) + centerPosition * (rhythms.length / 3));
+        }
+        
+        // 防止越界
+        index = Math.max(0, Math.min(rhythms.length - 1, index));
+        
+        // 记录日志更好地调试节奏选择
+        console.log(`节奏映射: x=${safeX.toFixed(2)} -> 索引=${index} -> 节奏=${rhythms[index]}`);
+        
+        return rhythms[index];
     }
 
     /**
@@ -666,6 +1224,202 @@ class AudioEngine {
             }
         } catch (err) {
             console.warn('设置音量时出错:', err);
+        }
+    }
+
+    /**
+     * 启动自动节奏生成器
+     * @param {Object} initialPattern - 初始音乐模式
+     * @private
+     */
+    _startRhythmGenerator(initialPattern) {
+        if (this.rhythmGenerator) {
+            // 如果已经存在，先清理
+            clearInterval(this.rhythmGenerator);
+        }
+        
+        // 存储上一次使用的音符信息
+        this.lastObjectNoteInfo = {
+            note: initialPattern.note,
+            rhythm: initialPattern.rhythm,
+            timbre: initialPattern.timbre,
+            isRightSide: initialPattern.isRightSide,
+            isLeftSide: initialPattern.isLeftSide
+        };
+        
+        // 使用统一的节奏模式 10010010
+        const currentPattern = this.rhythmPattern;
+        
+        // 计算节拍间隔，基于当前BPM设置
+        // 16分音符的时值 = 60秒 / BPM / 4
+        const sixteenthNoteTime = 60 / this.bpm / 4;
+        const intervalTime = sixteenthNoteTime * 1000; // 转为毫秒
+        
+        console.log(`启动自动节奏生成器，间隔: ${intervalTime.toFixed(0)}ms, BPM: ${this.bpm}`);
+        
+        // 创建自动节奏生成器
+        this.rhythmGenerator = setInterval(() => {
+            if (!this.isPlaying || !this.lastObjectNoteInfo) return;
+            
+            // 重要修改：如果是右侧区域，不要在这里触发音符，因为右侧区域已经在_handleRightSideZone中处理
+            if (this.lastObjectNoteInfo.isRightSide) {
+                return;
+            }
+            
+            // 检查步骤是否应该触发音符
+            if (currentPattern[this.rhythmStep]) {
+                // 使用固定的节奏值，不再随机选择
+                let rhythmValue = '16n'; // 固定使用16分音符
+                
+                // 使用固定的音高，即最初检测到的音高，不再进行随机变化
+                const note = this.lastObjectNoteInfo.note;
+                
+                // 播放固定音符
+                this.playNote(
+                    note,
+                    rhythmValue,
+                    this.lastObjectNoteInfo.isRightSide,
+                    this.lastObjectNoteInfo.isLeftSide
+                );
+                
+                console.log(`自动节奏: 步骤 ${this.rhythmStep}, 音符 ${note}, 节奏 ${rhythmValue}`);
+            }
+            
+            // 移动到下一步骤
+            this.rhythmStep = (this.rhythmStep + 1) % currentPattern.length;
+        }, intervalTime);
+    }
+
+    /**
+     * 处理移动物体 - 产生滑音效果
+     * @param {Object} pattern - 音乐模式
+     * @private
+     */
+    _handleMovingObject(pattern) {
+        try {
+            const { note } = pattern;
+            const now = Tone.now();
+            
+            // 如果滑音合成器还没有激活，或者音符发生了变化，则触发新的滑音
+            if (!this.glideActive || this.glideNote !== note) {
+                console.log(`激活滑音: ${note}`);
+                
+                // 如果已经有激活的滑音，先释放它
+                if (this.glideActive && this.mainSynths.glide) {
+                    this.mainSynths.glide.triggerRelease(now - 0.05);
+                }
+                
+                // 触发新的滑音
+                if (this.mainSynths.glide) {
+                    this.mainSynths.glide.triggerAttack(note, now);
+                    this.glideActive = true;
+                    this.glideNote = note;
+                }
+            } else {
+                // 如果滑音已经激活并且音符相同，则调整滑音参数
+                if (this.mainSynths.glide && typeof this.mainSynths.glide.setNote === 'function') {
+                    // 平滑过渡到新音符
+                    this.mainSynths.glide.setNote(note, now);
+                    console.log(`滑音过渡: ${note}`);
+                }
+            }
+        } catch (err) {
+            console.error('处理移动物体时出错:', err);
+        }
+    }
+    
+    /**
+     * 处理静止物体 - 产生固定节奏的单音
+     * @param {Object} pattern - 音乐模式
+     * @private
+     */
+    _handleStationaryObject(pattern) {
+        try {
+            // 如果之前有活跃的滑音，先停止它
+            if (this.glideActive && this.mainSynths.glide) {
+                console.log('停止滑音，切换到单音模式');
+                this.mainSynths.glide.triggerRelease();
+                this.glideActive = false;
+                this.glideNote = null;
+            }
+            
+            // 记录最新的音符信息
+            this.lastObjectNoteInfo = {
+                note: pattern.note,
+                rhythm: '8n', // 固定使用八分音符
+                timbre: pattern.timbre
+            };
+            
+            const now = Date.now();
+            
+            // 确保不会过于频繁触发音符
+            if (now - this.lastNoteTime < 250) { // 250ms限制
+                return;
+            }
+            
+            this.lastNoteTime = now;
+            
+            // 播放单个音符
+            this.playNote(pattern.note, '8n', false, false);
+            
+            // 如果自动节奏生成器尚未启动，则启动它
+            if (!this.rhythmGenerator) {
+                this._startRhythmGenerator(pattern);
+            }
+        } catch (err) {
+            console.error('处理静止物体时出错:', err);
+        }
+    }
+
+    /**
+     * 处理滑音音符 - 根据移动速度调整滑音参数
+     * @param {Object} pattern - 音乐模式
+     * @private
+     */
+    _handleSlideNotes(pattern) {
+        try {
+            const { note, moveSpeed } = pattern;
+            const now = Tone.now();
+            
+            // 根据移动速度调整滑音时间
+            // 移动速度越快，滑音时间越短（响应更快）
+            // 移动速度越慢，滑音时间越长（过渡更平滑）
+            let portamentoTime;
+            
+            if (moveSpeed > 0.003) { // 快速移动
+                portamentoTime = 0.05; // 非常快的滑音
+            } else if (moveSpeed > 0.001) { // 中速移动
+                portamentoTime = 0.15; // 中等滑音
+            } else { // 慢速移动
+                portamentoTime = 0.3; // 平滑滑音
+            }
+            
+            // 调整滑音合成器参数
+            if (this.mainSynths.glide) {
+                this.mainSynths.glide.set({
+                    "portamento": portamentoTime
+                });
+            }
+            
+            // 如果滑音合成器还没有激活，触发新的滑音
+            if (!this.glideActive) {
+                console.log(`启动滑音: ${note}, 滑音时间: ${portamentoTime}s`);
+                
+                if (this.mainSynths.glide) {
+                    this.mainSynths.glide.triggerAttack(note, now);
+                    this.glideActive = true;
+                    this.glideNote = note;
+                }
+            } else if (this.glideNote !== note) {
+                // 如果已经激活且音符发生了变化，更新音符
+                if (this.mainSynths.glide && typeof this.mainSynths.glide.setNote === 'function') {
+                    this.mainSynths.glide.setNote(note, now);
+                    this.glideNote = note;
+                    console.log(`滑音过渡: ${note}, 速度: ${moveSpeed.toFixed(5)}, 滑音时间: ${portamentoTime}s`);
+                }
+            }
+        } catch (err) {
+            console.error('处理滑音音符时出错:', err);
         }
     }
 }

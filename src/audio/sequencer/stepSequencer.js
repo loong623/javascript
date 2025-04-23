@@ -154,31 +154,83 @@ class StepSequencer {
             
             // 获取对应的鼓乐器
             const drum = drumKit[drumName];
-            if (!drum) continue;
+            if (!drum) {
+                console.warn(`找不到鼓组部件: ${drumName}`);
+                continue;
+            }
             
-            // 创建序列
-            const sequence = new Tone.Sequence(
-                (time, note) => {
-                    if (note) {
-                        // 触发鼓声
-                        drum.triggerAttackRelease(
-                            typeof note === 'string' ? note : 'C2', 
-                            '16n', 
-                            time
-                        );
-                    }
-                },
-                pattern,
-                this.subdivision
-            );
-            
-            // 存储序列
-            sequences[drumName] = sequence;
-            
-            // 如果音序器正在运行，也启动这个序列
-            if (this.isRunning) {
-                sequence.start('+0.1');
-                sequence.isStarted = true;
+            try {
+                // 创建序列
+                const sequence = new Tone.Sequence(
+                    (time, note) => {
+                        try {
+                            if (note) {
+                                // 设置防止爆音的延迟，确保任何潜在的干扰都已处理
+                                const safeTime = time + 0.005;
+                                
+                                // 为不同的鼓组部件使用适合的参数
+                                if (drumName === 'kick') {
+                                    // 鼓使用特定的音高
+                                    drum.triggerAttackRelease('C1', '32n', safeTime, 0.9);
+                                } else if (drumName === 'snare') {
+                                    // 噪声合成器不需要音高
+                                    drum.triggerAttackRelease('32n', safeTime, 0.8);
+                                } else if (drumName === 'hihat') {
+                                    // 简化高音镲触发逻辑，使用更直接的方式减少低频噪音
+                                    try {
+                                        // 关键改进：使用更短的音符长度，不做复杂的音量操作
+                                        // 通过直接使用清晰的参数设置而非音量控制来实现干净声音
+                                        
+                                        // 速度参数控制触发强度，降低以减少噪音
+                                        const hihatVelocity = 0.5;
+                                        
+                                        // 使用极短的音符长度
+                                        const noteDuration = '128n'; 
+                                        
+                                        // 直接触发，通过更简单的参数控制方式获得更干净的声音
+                                        drum.triggerAttackRelease(noteDuration, safeTime, hihatVelocity);
+                                    } catch (err) {
+                                        console.warn(`高音镲触发失败: ${err.message}`);
+                                        try {
+                                            // 降级方案 - 极短音符和极低力度
+                                            drum.triggerAttackRelease('128n', safeTime, 0.3);
+                                        } catch (finalErr) {
+                                            console.error('高音镲触发完全失败', finalErr);
+                                        }
+                                    }
+                                } else {
+                                    // 其他鼓组部件的默认处理
+                                    drum.triggerAttackRelease(
+                                        typeof note === 'string' ? note : '32n', 
+                                        '32n', 
+                                        safeTime,
+                                        0.7 // 默认音量
+                                    );
+                                }
+                                
+                                // 记录触发的鼓声，便于调试
+                                if (Tone.Transport.state === 'started') {
+                                    console.log(`触发鼓声: ${drumName} @ ${Math.round(time * 1000)}ms`);
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`触发鼓声 ${drumName} 时出错:`, err);
+                        }
+                    },
+                    pattern,
+                    this.subdivision
+                );
+                
+                // 存储序列
+                sequences[drumName] = sequence;
+                
+                // 如果音序器正在运行，也启动这个序列
+                if (this.isRunning) {
+                    sequence.start('+0.1');
+                    sequence.isStarted = true;
+                }
+            } catch (seqErr) {
+                console.error(`为 ${drumName} 创建序列时出错:`, seqErr);
             }
         }
         
@@ -187,19 +239,31 @@ class StepSequencer {
             sequences,
             start: () => {
                 Object.values(sequences).forEach(seq => {
-                    seq.start('+0.1');
-                    seq.isStarted = true;
+                    try {
+                        seq.start('+0.1');
+                        seq.isStarted = true;
+                    } catch (err) {
+                        console.error('启动鼓序列时出错:', err);
+                    }
                 });
             },
             stop: () => {
                 Object.values(sequences).forEach(seq => {
-                    seq.stop();
-                    seq.isStarted = false;
+                    try {
+                        seq.stop();
+                        seq.isStarted = false;
+                    } catch (err) {
+                        console.error('停止鼓序列时出错:', err);
+                    }
                 });
             },
             dispose: () => {
                 Object.values(sequences).forEach(seq => {
-                    seq.dispose();
+                    try {
+                        seq.dispose();
+                    } catch (err) {
+                        console.error('释放鼓序列时出错:', err);
+                    }
                 });
             }
         };

@@ -20,35 +20,49 @@ class PatternManager {
             blues: ['C3', 'Eb3', 'F3', 'F#3', 'G3', 'Bb3', 'C4', 'Eb4', 'F4', 'F#4', 'G4', 'Bb4']
         };
         
-        // 节奏模式
+        // 节奏模式 - 更加多样化的节奏
         this.rhythmPatterns = {
-            basic: ['8n', '4n', '2n', '1n'],
-            techno: ['16n', '8n', '8n.', '4n'],
-            jazz: ['8t', '4t', '2t', '1t'],
-            latin: ['16n', '8n', '8n.', '4n.']
+            // 基本节奏 - 简单稳定但有变化
+            basic: ['8n', '4n', '8n', '2n', '8n.', '4n', '8n', '1n'],
+            
+            // 电子音乐节奏 - 短促且有节奏感
+            techno: ['16n', '8n', '16n', '8n.', '8t', '16n', '16n', '4n+8n'],
+            
+            // 爵士风格 - 摇摆感和不规则性
+            jazz: ['8t', '4t', '8t', '2t', '4t', '8t', '16t', '4t.'],
+            
+            // 拉丁节奏 - 丰富的切分音和复合节奏
+            latin: ['16n', '8n.', '16n', '8n', '16n', '4n.', '8n', '16n']
         };
         
-        // 鼓模式
+        // 鼓模式 - 更加丰富多样的鼓点
         this.drumPatterns = {
+            // 基本鼓点 - 简单但是有变化
             basic: {
-                kick: ['C2', null, null, null, 'C2', null, null, null],
+                kick: ['C2', null, null, 'C2', null, null, 'C2', null],
                 snare: [null, null, 'C2', null, null, null, 'C2', null],
-                hihat: ['F#2', 'F#2', 'F#2', 'F#2', 'F#2', 'F#2', 'F#2', 'F#2']
+                hihat: ['F#2', null, 'F#2', null, 'F#2', null, 'F#2', 'F#2']
             },
+            
+            // 电子音乐鼓点 - 更密集和律动感强
             techno: {
-                kick: ['C2', null, null, 'C2', 'C2', null, null, 'C2'],
+                kick: ['C2', null, 'C2', 'C2', null, 'C2', null, 'C2'],
                 snare: [null, null, 'C2', null, null, null, 'C2', 'C2'],
-                hihat: ['F#2', 'F#2', 'F#2', 'F#2', 'F#2', 'F#2', 'F#2', 'F#2']
+                hihat: ['F#2', 'F#2', null, 'F#2', 'F#2', null, 'F#2', null]
             },
+            
+            // 爵士鼓点 - 更自由和摇摆感
             jazz: {
-                kick: ['C2', null, 'C2', null, null, 'C2', null, 'C2'],
-                snare: [null, null, 'C2', null, 'C2', null, null, 'C2'],
-                hihat: ['F#2', null, 'F#2', null, 'F#2', null, 'F#2', null]
-            },
-            latin: {
                 kick: ['C2', null, null, 'C2', null, 'C2', null, null],
-                snare: [null, null, 'C2', null, 'C2', null, 'C2', 'C2'],
-                hihat: ['F#2', 'F#2', 'F#2', 'F#2', 'F#2', 'F#2', 'F#2', 'F#2']
+                snare: [null, null, 'C2', null, 'C2', null, null, 'C2'],
+                hihat: ['F#2', null, 'F#2', 'F#2', null, 'F#2', null, 'F#2']
+            },
+            
+            // 拉丁鼓点 - 复杂和切分音丰富
+            latin: {
+                kick: ['C2', null, 'C2', null, null, 'C2', null, 'C2'],
+                snare: [null, 'C2', null, 'C2', null, null, 'C2', null],
+                hihat: ['F#2', null, 'F#2', null, 'F#2', 'F#2', null, 'F#2']
             }
         };
         

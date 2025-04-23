@@ -157,65 +157,72 @@ class SynthFactory {
         try {
             // 为每种鼓声创建一个合成器
             const kick = new Tone.MembraneSynth({
-                pitchDecay: 0.05,
-                octaves: 5,
+                pitchDecay: 0.05,   // 更短的音高衰减，使kick更紧凑有力
+                octaves: 5,         // 增加八度范围，使低音更明显
                 oscillator: { type: 'sine' },
                 envelope: {
-                    attack: 0.001,
-                    decay: 0.4,
-                    sustain: 0.01,
-                    release: 1.4
-                }
+                    attack: 0.001,  // 极短的攻击
+                    decay: 0.4,     // 适当增加衰减时间
+                    sustain: 0.01,  // 几乎不持续
+                    release: 1.4    // 更长的释放使低音更自然
+                },
+                volume: -6          // 稍微提高音量
             });
             
             const snare = new Tone.NoiseSynth({
-                noise: { type: 'white' },
+                noise: { 
+                    type: 'white',
+                    playbackRate: 3
+                },
                 envelope: {
-                    attack: 0.005,
-                    decay: 0.1,
-                    sustain: 0.01,
-                    release: 0.3
-                }
+                    attack: 0.001,  // 更短的攻击
+                    decay: 0.13,    // 稍长的衰减
+                    sustain: 0,     // 没有持续音
+                    release: 0.2
+                },
+                volume: -10         // 略微降低音量
             });
             
             const hihat = new Tone.MetalSynth({
-                frequency: 800,
+                frequency: 700,     // 上调频率，避免低频共振
+                harmonicity: 4.0,   // 适当提高谐波比
+                modulationIndex: 32, // 恢复调制指数以保持清脆感
                 envelope: {
-                    attack: 0.001,
-                    decay: 0.1,
-                    release: 0.02
+                    attack: 0.003,  // 更短的攻击，减少低频起音部分
+                    decay: 0.025,   // 快速衰减，减少持续时间
+                    sustain: 0,     
+                    release: 0.02   // 更短的释放时间
                 },
-                harmonicity: 5.1,
-                modulationIndex: 32,
-                resonance: 4000,
-                octaves: 1.5
+                volume: -25,        // 比之前稍高一点，但仍控制在安全范围
+                resonance: 4000,    // 提高共振频率，突出高频部分
+                octaves: 1.2,       // 适当的八度范围
+                
+                // 滤波器参数更平衡
+                filterEnvelope: {
+                    attack: 0.001,
+                    decay: 0.02,
+                    sustain: 0,
+                    release: 0.015,
+                    baseFrequency: 2000,  // 提高基础频率，避开低频范围
+                    octaves: -0.5         // 较轻微地抑制高频成分
+                }
             });
             
-            // 设置音量
-            const level = -5;
-            kick.volume.value = level - 10;
-            snare.volume.value = level - 15;
-            hihat.volume.value = level - 20;
+            console.log("创建鼓组...");
             
-            // 将所有鼓声连接到输出
-            // 默认我们不连接到输出，因为我们会通过效果链连接
-            // kick.toDestination();
-            // snare.toDestination();
-            // hihat.toDestination();
-            
-            console.log("鼓组已创建，音量级别:", level);
-            
-            // 返回包含所有鼓声的对象
+            // 将所有鼓组合成器放入对象并返回
             return this._storeSynth('drumKit', { kick, snare, hihat });
         } catch (error) {
             console.error("创建鼓组时出错:", error);
             
             // 返回一个简单的备用鼓组
-            return this._storeSynth('drumKit', {
-                kick: new Tone.MembraneSynth().toDestination(),
-                snare: new Tone.NoiseSynth().toDestination(),
-                hihat: new Tone.MetalSynth().toDestination()
-            });
+            const fallbackKit = {
+                kick: new Tone.MembraneSynth({ volume: -12 }),
+                snare: new Tone.NoiseSynth({ volume: -14 }),
+                hihat: new Tone.MetalSynth({ volume: -20 })
+            };
+            
+            return this._storeSynth('drumKit', fallbackKit);
         }
     }
     

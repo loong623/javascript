@@ -190,39 +190,84 @@ class NoiseUtils {
      * @param {number} intensity - 信号强度 (0-1)
      */
     handlePeakSignal(gate, intensity) {
-        if (!gate || typeof gate !== 'object' || 
-            !gate.threshold || typeof gate.threshold !== 'object' ||
-            typeof gate.threshold.rampTo !== 'function') {
-            console.warn('无法处理峰值信号: 噪声门无效或不支持 rampTo');
+        // 更健壮的参数检查
+        if (!gate || typeof gate !== 'object') {
+            console.warn('无法处理峰值信号: 噪声门无效');
             return;
         }
-        
+
         try {
             // 确保 intensity 在有效范围内
             const safeIntensity = Math.max(0, Math.min(1, intensity || 0.5));
             
-            // 安全获取当前阈值
-            let currentThreshold;
+            // 检查 threshold 属性
+            if (!gate.threshold) {
+                console.warn('无法处理峰值信号: 噪声门没有阈值属性');
+                return;
+            }
+
+            // 获取当前阈值 - 使用更安全的方法
+            let currentThreshold = -30; // 默认值
             try {
-                currentThreshold = gate.threshold.value;
-                if (typeof currentThreshold !== 'number') {
-                    currentThreshold = -30; // 使用默认值
+                // 如果是对象类型，则尝试获取value属性
+                if (typeof gate.threshold === 'object' && gate.threshold !== null) {
+                    if (typeof gate.threshold.value === 'number') {
+                        currentThreshold = gate.threshold.value;
+                    }
+                } 
+                // 如果是数字类型，直接使用
+                else if (typeof gate.threshold === 'number') {
+                    currentThreshold = gate.threshold;
                 }
             } catch (e) {
-                console.warn('无法获取当前阈值，使用默认值:', e);
-                currentThreshold = -30;
+                console.warn('获取当前阈值时出错，使用默认值:', e);
             }
             
+            // 计算峰值阈值
             const peakThreshold = Math.min(-20, currentThreshold + (safeIntensity * 5));
             
-            // 快速提高阈值
-            gate.threshold.rampTo(peakThreshold, 0.05);
+            // 尝试调整阈值 - 兼容多种情况
+            if (typeof gate.threshold === 'object' && gate.threshold !== null) {
+                // 1. 首先尝试使用 rampTo 方法
+                if (typeof gate.threshold.rampTo === 'function') {
+                    gate.threshold.rampTo(peakThreshold, 0.05);
+                } 
+                // 2. 如果没有 rampTo 方法，尝试直接设置值
+                else if ('value' in gate.threshold) {
+                    try {
+                        gate.threshold.value = peakThreshold;
+                    } catch (e) {
+                        console.warn('无法设置阈值属性:', e);
+                    }
+                }
+                // 3. 如果以上都失败，尝试设置整个阈值属性
+                else {
+                    try {
+                        gate.threshold = peakThreshold;
+                    } catch (e) {
+                        console.warn('无法设置阈值:', e);
+                    }
+                }
+            } 
+            // 如果阈值是数字，直接设置
+            else if (typeof gate.threshold === 'number') {
+                gate.threshold = peakThreshold;
+            }
             
             // 之后恢复阈值
             setTimeout(() => {
                 try {
-                    if (gate && gate.threshold && typeof gate.threshold.rampTo === 'function') {
-                        gate.threshold.rampTo(currentThreshold, 0.2);
+                    // 与上面相同的逻辑处理恢复阈值
+                    if (typeof gate.threshold === 'object' && gate.threshold !== null) {
+                        if (typeof gate.threshold.rampTo === 'function') {
+                            gate.threshold.rampTo(currentThreshold, 0.2);
+                        } else if ('value' in gate.threshold) {
+                            gate.threshold.value = currentThreshold;
+                        } else {
+                            gate.threshold = currentThreshold;
+                        }
+                    } else if (typeof gate.threshold === 'number') {
+                        gate.threshold = currentThreshold;
                     }
                 } catch (e) {
                     console.warn('恢复阈值时出错:', e);

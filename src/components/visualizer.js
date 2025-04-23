@@ -13,7 +13,7 @@ class Visualizer {
         this.showBoundingBoxes = true;
         this.showMusicInfo = true;
         this.musicVisualization = true;
-        this.showZones = true; // Show left/right interaction zones
+        this.showZones = false; // 默认不显示区域，因为已经只有一个统一音区
         
         // Audio visualization properties
         this.particles = [];
@@ -22,9 +22,8 @@ class Visualizer {
         this.lastNote = null;
         this.lastTimbre = null;
         
-        // Zone boundaries
-        this.leftZoneBoundary = 0.3; // 30% from left
-        this.rightZoneBoundary = 0.7; // 70% from left
+        // 移除音区边界
+        // 整个屏幕现在是一个统一的音区
         
         // 添加视频尺寸监听器
         this._setupVideoSizeObserver();
@@ -191,15 +190,8 @@ class Visualizer {
                     if (this.showMusicInfo) {
                         // Draw music info if this is the primary object
                         if (prediction === predictions[0]) {
-                            // Determine which zone the object is in
-                            const normalizedX = x / this.canvas.width;
-                            let zoneText = "中央音区";
-                            
-                            if (normalizedX < this.leftZoneBoundary) {
-                                zoneText = "低音节奏区";
-                            } else if (normalizedX > this.rightZoneBoundary) {
-                                zoneText = "高音滑音区";
-                            }
+                            // 统一为一个音区，不再区分左中右
+                            const zoneText = "统一音区";
                             
                             this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
                             this.ctx.fillRect(x, y + height + 5, width, 65);
@@ -207,7 +199,7 @@ class Visualizer {
                             this.ctx.fillStyle = 'white';
                             this.ctx.font = '12px Arial';
                             this.ctx.fillText(`音高: Y坐标 (${Math.round(y)})`, x + 5, y + height + 20);
-                            this.ctx.fillText(`节奏: X坐标 (${Math.round(x)})`, x + 5, y + height + 35);
+                            this.ctx.fillText(`节奏: 物品移动检测`, x + 5, y + height + 35);
                             this.ctx.fillText(`音色: ${prediction.class}`, x + 5, y + height + 50);
                             this.ctx.fillText(`当前区域: ${zoneText}`, x + 5, y + height + 65);
                         }
