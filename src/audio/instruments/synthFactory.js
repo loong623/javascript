@@ -269,6 +269,64 @@ class SynthFactory {
     }
     
     /**
+     * 创建一个猫叫声合成器
+     * @param {Object} options - 合成器选项
+     * @returns {Tone.MonoSynth} 配置好的猫叫声合成器
+     */
+    createCatSynth(options = {}) {
+        try {
+            // 默认设置与提供的选项合并 - 模拟猫叫声的参数
+            const settings = {
+                oscillator: { 
+                    type: 'sawtooth'  // 锯齒波最接近猫叫声的粗糙质感
+                },
+                envelope: {
+                    attack: 0.1,      // 稍慢的起音模拟猫叫开始
+                    decay: 0.1,       // 快速衰减
+                    sustain: 0.3,     // 中等持续
+                    release: 2.0      // 较长的释放模拟猫叫的余音
+                },
+                filter: {
+                    Q: 6,             // 高共振峰值使声音更尖锐
+                    type: "bandpass", // 带通滤波器模拟猫叫声的频率特性
+                    rolloff: -12      // 滚降率
+                },
+                filterEnvelope: {
+                    attack: 0.04,     // 快速滤波器包络起音
+                    attackCurve: "exponential",
+                    decay: 0.5,
+                    decayCurve: "exponential",
+                    sustain: 0.3,
+                    release: 0.6,
+                    baseFrequency: 800, // 围绕猫叫声的主要频率
+                    octaves: 2          // 滤波器包络范围
+                },
+                portamento: 0.15,     // 滑音时间
+                volume: -10,          // 音量
+                ...options
+            };
+            
+            // 创建单音合成器作为猫叫声合成器基础
+            const catSynth = new Tone.MonoSynth(settings);
+            
+            // 输出创建信息
+            console.log("创建猫叫声合成器:", {
+                type: settings.oscillator.type,
+                volume: settings.volume
+            });
+            
+            return this._storeSynth('cat', catSynth);
+        } catch (error) {
+            console.error("创建猫叫声合成器时出错:", error);
+            
+            // 返回一个简单的备用合成器
+            const fallbackSynth = new Tone.MonoSynth().toDestination();
+            fallbackSynth.volume.value = -15;
+            return fallbackSynth;
+        }
+    }
+
+    /**
      * 创建一个测试音
      * 用于验证音频系统是否工作
      */

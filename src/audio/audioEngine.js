@@ -83,7 +83,7 @@ class AudioEngine {
                     attack: 0.05, // 修复八进制字面量错误(从05改为0.05)
                     decay: 0.4,
                     sustain: 0.6, // 增加持续值
-                    release: 1.0  // 减少释放时间，避免音符重叠
+                    release: 1.0  // 减少释放时间，避免音符重反
                 },
                 filterEnvelope: {
                     attack: 0.02,
@@ -96,17 +96,30 @@ class AudioEngine {
                 volume: -2  // 显著提高低音区音量，使后两个音更清晰
             }),
             
-            // 滑音合成器 - 用于物品移动时
-            glide: this.synthFactory.createMonoSynth({
-                oscillator: { type: 'sawtooth' },
+            // 猫咪滑音合成器 - 用于物品移动时 (替换原有的滑音合成器)
+            glide: this.synthFactory.createCatSynth({
+                oscillator: { type: 'sawtooth' }, // 猫叫声使用锯齿波
                 envelope: {
-                    attack: 0.03,
-                    decay: 0.2,
-                    sustain: 0.8,
-                    release: 1.0
+                    attack: 0.1,    // 稍长的起音模拟猫叫开始
+                    decay: 0.15,    // 衰减
+                    sustain: 0.5,   // 增加持续使猫叫更明显
+                    release: 1.5     // 增加释放时间模拟猫叫尾音
                 },
-                portamento: 0.15, // 降低滑音时间使其更响应
-                volume: -12  // 调整滑音区音量
+                filter: {
+                    Q: 8,           // 更高的共振使声音更接近猫叫
+                    type: "bandpass",
+                    rolloff: -12
+                },
+                filterEnvelope: {
+                    attack: 0.03,
+                    decay: 0.4,
+                    sustain: 0.2,
+                    release: 0.8,
+                    baseFrequency: 900,
+                    octaves: 2.5     // 增加范围使音高变化更戏剧化
+                },
+                portamento: 0.2,    // 增加滑音时间，使音高变化更明显
+                volume: -8          // 适当调整音量
             })
         };
         
@@ -872,133 +885,7 @@ class AudioEngine {
      * @param {string} objectClass - 对象类名
      * @returns {Object} 音乐模式描述
      */
-    createPattern(x, y, objectClass) {
-        // 基本参数映射
-        const baseNote = this.mapToNote(y);
-        const rhythm = this.mapToRhythm(x);
-        const timbre = this.setTimbre(objectClass);
-        
-        // 区域划分 - 更细致的划分以提高音乐变化
-        const isRightSide = x > 0.7;
-        const isLeftSide = x < 0.3;
-        const isCenterLow = x >= 0.3 && x <= 0.5;  // 中央偏左区域
-        const isCenterHigh = x > 0.5 && x <= 0.7;  // 中央偏右区域
-        
-        // 初始默认音符
-        let note = baseNote;
-        
-        // ===== 区域特殊音乐处理 =====
-        
-        // 为中间区域增加和弦和旋律变化
-        if (!isLeftSide && !isRightSide) {
-            // 获取音符在当前音阶中的索引
-            const scale = this.scales[this.currentScale];
-            const noteIndex = scale.indexOf(baseNote);
-            
-            if (noteIndex !== -1) {
-                // 添加和弦变化
-                const now = Tone.now();
-                
-                // 每两秒变更一次音乐模式，避免单调
-                const patternSeed = Math.floor(now / 2) % 4;
-                
-                if (isCenterLow) {
-                    // 中央偏左区域 - 加入部分低音和和弦效果
-                    switch (patternSeed) {
-                        case 0:
-                            // 原音符
-                            break;
-                        case 1: 
-                            // 低一个八度
-                            const lowerOctave = baseNote.replace(/(\d+)$/, (match) => {
-                                const octave = parseInt(match);
-                                return Math.max(2, octave - 1);
-                            });
-                            note = lowerOctave;
-                            break;
-                        case 2:
-                            // 三度音
-                            if (noteIndex + 2 < scale.length) {
-                                note = scale[noteIndex + 2];
-                            }
-                            break;
-                        case 3:
-                            // 五度音
-                            if (noteIndex + 4 < scale.length) {
-                                note = scale[noteIndex + 4];
-                            }
-                            break;
-                    }
-                } 
-                else if (isCenterHigh) {
-                    // 中央偏右区域 - 加入部分高音和装饰音效果
-                    switch (patternSeed) {
-                        case 0:
-                            // 原音符
-                            break;
-                        case 1:
-                            // 高八度
-                            const higherOctave = baseNote.replace(/(\d+)$/, (match) => {
-                                const octave = parseInt(match);
-                                return Math.min(6, octave + 1);
-                            });
-                            note = higherOctave;
-                            break;
-                        case 2:
-                            // 增加二度音
-                            if (noteIndex + 1 < scale.length) {
-                                note = scale[noteIndex + 1];
-                            }
-                            break;
-                        case 3:
-                            // 七度音(如果存在)
-                            if (noteIndex + 6 < scale.length) {
-                                note = scale[noteIndex + 6];
-                            }
-                            break;
-                    }
-                }
-                
-                // 使用时间因素改变节奏模式，避免过于规律
-                // 每3.5秒变更一次节奏型
-                const rhythmMod = Math.floor(now / 3.5) % 3;
-                let rhythmAdjust = rhythm;
-                
-                // 根据位置和时间添加节奏变化
-                if ((isCenterLow && rhythmMod === 1) || (isCenterHigh && rhythmMod === 2)) {
-                    // 转换为附点音符以增加节奏变化
-                    if (rhythm === '8n') {
-                        rhythmAdjust = '8n.';
-                    } else if (rhythm === '4n') {
-                        rhythmAdjust = '4n.';
-                    }
-                }
-                
-                // 有10%概率添加断奏效果
-                if (Math.random() < 0.1) {
-                    // 缩短音符长度，模拟断奏
-                    if (rhythm === '4n') {
-                        rhythmAdjust = '8n';
-                    } else if (rhythm === '2n') {
-                        rhythmAdjust = '4n';
-                    }
-                }
-                
-                return {
-                    note,
-                    rhythm: rhythmAdjust,
-                    timbre,
-                    isRightSide,
-                    isLeftSide,
-                    isCenterLow,
-                    isCenterHigh
-                };
-            }
-        }
-        
-        // 默认返回基本模式
-        return { note, rhythm, timbre, isRightSide, isLeftSide };
-    }
+    
 
     /**
      * 基于检测到的对象生成音乐
@@ -1516,17 +1403,7 @@ class AudioEngine {
                 console.log(`为物体 ${objectId} 创建新的滑音合成器, 初始音符: ${note}`);
                 
                 // 创建新的滑音合成器，基于主滑音合成器的设置
-                const objectSynth = this.synthFactory.createMonoSynth({
-                    oscillator: { type: 'sawtooth' },
-                    envelope: {
-                        attack: 0.03,
-                        decay: 0.2,
-                        sustain: 0.8,
-                        release: 1.0
-                    },
-                    portamento: portamentoTime,
-                    volume: -12
-                });
+                const objectSynth = this.synthFactory.createCatSynth();
                 
                 // 连接到主效果链
                 if (this.mainEffectsChain) {
