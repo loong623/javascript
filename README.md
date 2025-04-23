@@ -2,35 +2,37 @@
 
 ## Introduction 简介
 
-This is an interactive music generator based on computer vision. Through camera object recognition, it generates music in real-time according to the position and characteristics of objects. The system uses an advanced sequencer architecture with noise cancellation technology.
+This is an interactive music generator based on computer vision. Through camera object recognition, it generates music in real-time according to the position and movement characteristics of objects. The system uses an advanced sequencer architecture with adaptive glide control and intelligent noise cancellation technology.
 
-这是一个基于计算机视觉的交互式音乐生成器。通过摄像头识别特定物品，根据物品的位置和特征实时生成音乐。系统采用先进的音序器架构和噪音消除技术。
+这是一个基于计算机视觉的交互式音乐生成器。通过摄像头识别特定物品，根据物品的位置和移动特征实时生成音乐。系统采用先进的音序器架构，具备自适应滑音控制和智能噪音消除技术。
 
 ## Features 功能特点
 
 - Real-time camera video stream processing
-- Object recognition and tracking
-- Real-time music generation based on object position and characteristics
+- Object recognition and tracking with movement analysis
+- Adaptive music generation based on movement speed and position
+- Dynamic glide effect controlled by object movement speed
+- Automatic bass chord progression (1-6-4-5) with drum patterns
 - Advanced sequencer architecture with quantized timing
 - Enhanced noise cancellation and audio quality optimization
-- Customizable timbre, pitch, and rhythm patterns
-- Interactive sound zones with different musical behaviors
+- Customizable timbre mapping to object types
 - Visual feedback with customizable display options
 
 ---
 
 - 实时摄像头视频流处理
-- 物品识别和追踪
-- 基于物品位置和特征的实时音乐生成
+- 物品识别、追踪及移动分析
+- 基于物品移动速度和位置的自适应音乐生成
+- 由物体移动速度控制的动态滑音效果
+- 自动低音和弦进行（1-6-4-5）配合鼓机节奏
 - 先进的音序器架构，实现量化定时
 - 增强的噪音消除和音频质量优化
-- 可自定义音色、音高和节奏型
-- 具有不同音乐行为的交互式声音区域
+- 可自定义的物品类型音色映射
 - 可自定义显示选项的视觉反馈
 
 ## Technology Stack 技术栈
 
-- TensorFlow.js - For object recognition
+- TensorFlow.js - For object recognition and movement analysis
 - Tone.js - For advanced audio synthesis, sequencing and effects
 - Web Audio API - For audio generation and processing
 - MediaDevices API - For camera access
@@ -39,7 +41,7 @@ This is an interactive music generator based on computer vision. Through camera 
 
 ---
 
-- TensorFlow.js - 用于物品识别
+- TensorFlow.js - 用于物品识别和移动分析
 - Tone.js - 用于高级音频合成、音序和效果
 - Web Audio API - 用于音频生成和处理
 - MediaDevices API - 用于摄像头访问
@@ -84,22 +86,28 @@ This is an interactive music generator based on computer vision. Through camera 
 3. The vertical position (Y-coordinate) of the object controls pitch
    物品的垂直位置（Y坐标）控制音高
    
-4. The horizontal position (X-coordinate) controls rhythm and sound effects:
-   物品的水平位置（X坐标）控制节奏和音效：
+4. The movement speed controls the sound behavior:
+   物品的移动速度控制音效行为：
    
-   - Left zone (0-30%): Bass rhythm area with minimal delay effect
-     左侧区域（0-30%）：低音节奏区，具有最小延迟效果
+   - Fast movement: Quick glide transitions between notes
+     快速移动：音符间的快速滑音过渡
      
-   - Center zone (30-70%): Standard tone area with moderate effects
-     中央区域（30-70%）：标准音区，具有适中效果
+   - Medium movement: Moderate glide with balanced response
+     中等移动：平衡响应的中等滑音
      
-   - Right zone (70-100%): High-pitched glide area with enhanced delay effect
-     右侧区域（70-100%）：高音滑音区，具有增强延迟效果
-     
-5. The object type (e.g., phone, book) controls the timbre
+   - Slow/stationary: Smooth glide with longer transition time
+     缓慢/静止：具有较长过渡时间的平滑滑音
+   
+5. The background drum and bass pattern plays automatically:
+   背景鼓机和低音模式自动播放：
+   
+   - Automatic 1-6-4-5 bass progression synced with drum pattern
+     自动1-6-4-5低音和弦进行，与鼓机节奏同步
+   
+6. The object type (e.g., phone, book) controls the timbre
    物品的类型（如手机、书本）控制音色
 
-6. Use the control panel to:
+7. Use the control panel to:
    使用控制面板可以：
    
    - Select musical scale (Major, Minor, Pentatonic, Blues)
@@ -167,28 +175,34 @@ interactive-music-generator/
 
 ## Audio Architecture Overview 音频架构概述
 
-The system uses a modular sequencer architecture with these key components:
+The system uses an advanced adaptive audio architecture with these key components:
 
-系统采用模块化音序器架构，包含以下关键组件：
+系统采用先进的自适应音频架构，包含以下关键组件：
 
-1. **Step Sequencer** - Provides beat-synchronized timing and pattern sequencing
+1. **Movement-Adaptive Synthesis** - Dynamically adjusts glide parameters based on movement speed
+   **移动自适应合成** - 根据移动速度动态调整滑音参数
+
+2. **Step Sequencer** - Provides beat-synchronized timing and pattern sequencing
    **步进音序器** - 提供节拍同步时序和模式排序
 
-2. **Pattern Manager** - Manages musical patterns, scales, and instrument timbres
+3. **Bass Chord Progression** - Automatic 1-6-4-5 progression synchronized with drum patterns
+   **低音和弦进行** - 与鼓机节奏同步的自动1-6-4-5进行
+
+4. **Pattern Manager** - Manages musical patterns, scales, and instrument timbres
    **模式管理器** - 管理音乐模式、音阶和乐器音色
 
-3. **Effects Chain** - Processes audio through configurable effect chains
-   **效果链** - 通过可配置的效果链处理音频
+5. **Effects Chain** - Processes audio through configurable effect chains with dynamic adjustment
+   **效果链** - 通过可动态调整的配置效果链处理音频
 
-4. **Noise Cancellation** - Advanced noise gate with adaptive threshold adjustment
-   **噪音消除** - 具有自适应阈值调整的高级噪声门
+6. **Enhanced Noise Cancellation** - Advanced noise gate with adaptive threshold adjustment
+   **增强噪音消除** - 具有自适应阈值调整的高级噪声门
 
-5. **Synthesizer Factory** - Creates and manages various synthesizer instruments
-   **合成器工厂** - 创建和管理各种合成器乐器
+7. **Synthesizer Factory** - Creates and manages various synthesizer instruments with optimized parameters
+   **合成器工厂** - 创建和管理具有优化参数的各种合成器乐器
 
-This architecture ensures high-quality sound with minimal noise while maintaining responsive interactivity.
+This architecture delivers a more natural and expressive musical experience by responding intuitively to object movements, while maintaining high audio quality with minimal noise.
 
-该架构确保在保持响应式交互的同时提供高质量、低噪音的声音。
+该架构通过直观响应物体移动，提供更加自然和富有表现力的音乐体验，同时保持高音质和低噪音。
 
 ## Contribution Guidelines 贡献指南
 
