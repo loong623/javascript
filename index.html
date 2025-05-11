@@ -4,12 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interactive Music Generator</title>
-    <style>
-        body {
+    <style>        body {
             margin: 0;
             padding: 20px;
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            background-image: url('/background/b.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
         }
         .container {
             max-width: 1200px;
@@ -18,12 +21,18 @@
         .header {
             text-align: center;
             margin-bottom: 20px;
+            background-color: #f5f5dc;
+            padding: 20px;
+            border-radius: 8px;
         }
         .description {
             text-align: center;
             max-width: 800px;
             margin: 0 auto 30px;
             line-height: 1.6;
+            background-color: #f5f5dc;
+            padding: 20px;
+            border-radius: 8px;
         }
         .video-container {
             position: relative;
@@ -165,11 +174,11 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <div class="header" style="background-color: #f5f5dc; padding: 20px; border-radius: 8px;">
             <h1>Interactive Music Generator</h1>
         </div>
         
-        <div class="description">
+        <div class="description" style="background-color: #f5f5dc; padding: 20px; border-radius: 8px;">
             <p>使用摄像头识别物品，根据物品在画面中的位置和特征生成音乐。物品的垂直位置（Y坐标）控制音高，水平位置（X坐标）控制音效，物品类型控制音色。</p>
         </div>
         

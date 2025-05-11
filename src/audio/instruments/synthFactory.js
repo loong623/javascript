@@ -324,6 +324,86 @@ class SynthFactory {
             fallbackSynth.volume.value = -15;
             return fallbackSynth;
         }
+    }    /**
+     * 创建一个基于采样的猫叫声采样器
+     * @param {Object} options - 采样器选项
+     * @returns {Tone.Sampler} 配置好的猫叫采样器
+     */
+    createCatSampler(options = {}) {
+        try {
+            // 定义猫叫采样，使用正确的路径
+            const catSamples = {
+                "C4": "miao/1.wav", 
+                "D4": "miao/2.wav",
+                "E4": "miao/3.wav", 
+                "F4": "miao/4.wav",
+                "G4": "miao/5.wav",
+                "A4": "miao/6.wav"
+            };
+            
+            // 默认设置与提供的选项合并
+            const settings = {
+                urls: catSamples,
+                baseUrl: "/", // 设置基础URL，确保从public目录加载
+                release: 1.5,
+                attack: 0.1,
+                volume: -5,
+                ...options,                onload: () => {
+                    console.log("猫叫声采样器加载完成，所有样本已准备就绪");
+                    // 设置一个自定义标志，表示采样器已经准备好
+                    if (catSampler) {
+                        // 不直接设置内置的loaded属性，而是使用自己的isLoaded标志
+                        catSampler._isLoaded = true;
+                        
+                        // 如果有待触发的声音，现在触发
+                        if (catSampler.pendingTriggers && catSampler.pendingTriggers.length > 0) {
+                            catSampler.pendingTriggers.forEach(trigger => {
+                                try {
+                                    console.log(`触发延迟的猫叫采样: ${trigger.note}`);
+                                    catSampler.triggerAttackRelease(trigger.note, trigger.duration, trigger.time);
+                                } catch (err) {
+                                    console.warn("触发延迟的猫叫采样失败:", err);
+                                }
+                            });
+                            catSampler.pendingTriggers = [];
+                        }
+                    }
+                }
+            };
+            
+            // 创建采样器，不要立即连接到目的地，让audioEngine来处理连接
+            const catSampler = new Tone.Sampler(settings);
+            
+            console.log("创建猫叫声采样器，使用真实猫叫音频");
+              // 存储触发队列，用于在采样器加载完成前尝试触发的声音
+            catSampler.pendingTriggers = [];
+            catSampler._isLoaded = false; // 使用自定义标志而不是直接设置loaded属性
+              // 添加安全触发方法
+            catSampler.safeTriggerAttackRelease = function(note, duration, time) {
+                if (this._isLoaded || this.loaded) { // 检查自定义标志或内置loaded属性
+                    // 如果已加载，直接触发
+                    console.log(`直接触发猫叫采样: ${note}`);
+                    return this.triggerAttackRelease(note, duration, time);
+                } else {
+                    // 如果尚未加载，将此触发添加到待处理队列
+                    console.log(`延迟触发猫叫采样: ${note} (等待加载)`);
+                    this.pendingTriggers.push({ note, duration, time });
+                    return this;
+                }
+            };
+            
+            // 存储并返回
+            return this._storeSynth('catSampler', catSampler);
+        } catch (error) {
+            console.error("创建猫叫采样器时出错:", error);
+            
+            // 返回一个简单的备用合成器，使用合成猫叫声作为后备
+            console.warn("使用合成猫叫声作为后备");
+            return this.createCatSynth({
+                volume: -8,
+                portamento: 0.2
+            });
+        }
     }
 
     /**

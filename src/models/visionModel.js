@@ -183,12 +183,10 @@ class VisionModel {
      * @returns {Array} 过滤后的检测结果
      */
     filterPredictions(predictions) {
-        // 过滤掉低置信度检测和不在列表中的物品
-        const minConfidence = 0.5; // 最低置信度阈值
-        
+        const minConfidence = 0.5;
         return predictions.filter(prediction => 
             prediction.score >= minConfidence &&
-            this.objectsToDetect.includes(prediction.class)
+            prediction.class === 'person' // 只保留人类
         );
     }
     

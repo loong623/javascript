@@ -100,26 +100,34 @@ class AudioEngine {
             glide: this.synthFactory.createCatSynth({
                 oscillator: { type: 'sawtooth' }, // 猫叫声使用锯齿波
                 envelope: {
-                    attack: 0.1,    // 稍长的起音模拟猫叫开始
-                    decay: 0.15,    // 衰减
-                    sustain: 0.5,   // 增加持续使猫叫更明显
-                    release: 1.5     // 增加释放时间模拟猫叫尾音
+                    // 使用随机偏置生成更自然的猫叫声参数
+                    attack: 0.1 + (Math.random() * 0.1 - 0.05),    // 范围 0.05-0.15
+                    decay: 0.15 + (Math.random() * 0.1 - 0.05),    // 范围 0.1-0.2
+                    sustain: 0.5 + (Math.random() * 0.2 - 0.1),    // 范围 0.4-0.6
+                    release: 1.5 + (Math.random() * 0.6 - 0.3)     // 范围 1.2-1.8
                 },
                 filter: {
-                    Q: 8,           // 更高的共振使声音更接近猫叫
+                    Q: 8 + (Math.random() * 4 - 2),           // 范围 6-10
                     type: "bandpass",
                     rolloff: -12
                 },
                 filterEnvelope: {
-                    attack: 0.03,
-                    decay: 0.4,
-                    sustain: 0.2,
-                    release: 0.8,
-                    baseFrequency: 900,
-                    octaves: 2.5     // 增加范围使音高变化更戏剧化
+                    attack: 0.03 + (Math.random() * 0.02 - 0.01),
+                    decay: 0.4 + (Math.random() * 0.2 - 0.1),
+                    sustain: 0.2 + (Math.random() * 0.1 - 0.05),
+                    release: 0.8 + (Math.random() * 0.4 - 0.2),
+                    baseFrequency: 900 + (Math.random() * 200 - 100),
+                    octaves: 2.5 + (Math.random() * 1 - 0.5)     // 范围 2.0-3.0
                 },
-                portamento: 0.2,    // 增加滑音时间，使音高变化更明显
-                volume: -8          // 适当调整音量
+                portamento: 0.2 + (Math.random() * 0.1 - 0.05),    // 范围 0.15-0.25
+                volume: -8 + (Math.random() * 2 - 1)          // 范围 -9 到 -7
+            }),
+            
+            // 添加猫叫采样器
+            catSampler: this.synthFactory.createCatSampler({
+                volume: -5,
+                release: 1.5,
+                attack: 0.1
             })
         };
         
@@ -297,10 +305,11 @@ class AudioEngine {
         drumEffectsChain.drumVolume.connect(Tone.getDestination());
         
         // 将主效果链连接到输出
-        mainEffectsChain.masterVolume.toDestination();
+        mainEffectsChain.masterVolume.toDestination(); 
         
         // 存储引用以便后续使用
         this.mainEffectsChain = mainEffectsChain;
+
         this.drumEffectsChain = drumEffectsChain;
     }
 
@@ -1382,13 +1391,41 @@ class AudioEngine {
             // 如果音符发生变化，更新滑音
             if (glideData.note !== note) {
                 try {
-                    if (glideData.synth && typeof glideData.synth.setNote === 'function') {
+                    if (glideData.synthType === 'glide' && glideData.synth && typeof glideData.synth.setNote === 'function') {
                         // 设置新的滑音时间
                         glideData.synth.set({ "portamento": portamentoTime });
                         
                         // 平滑过渡到新音符
                         glideData.synth.setNote(note, now);
                         console.log(`物体 ${objectId} 滑音过渡: ${glideData.note} -> ${note}, 速度: ${moveSpeed.toFixed(5)}`);
+                        
+                        // 更新音符
+                        glideData.note = note;
+                    } else if (glideData.synthType === 'sampler') {
+                        // 采样器类型：随机选择一个猫叫音频文件播放
+                        const catNotes = ["C4", "D4", "E4", "F4", "G4", "A4"];
+                        const randomCatNote = catNotes[Math.floor(Math.random() * catNotes.length)];                        // 使用安全触发方法，避免缓冲区未加载错误
+                        if (glideData.synth.safeTriggerAttackRelease) {
+                            glideData.synth.safeTriggerAttackRelease(randomCatNote, "1n", now);
+                            console.log(`物体 ${objectId} 安全触发采样猫叫: ${randomCatNote}`);
+                        } else {
+                            // 降级处理：如果没有安全触发方法，检查采样器是否已加载
+                            const isLoaded = glideData.synth._isLoaded || (typeof glideData.synth.loaded === 'boolean' ? glideData.synth.loaded : false);
+                            if (isLoaded) {
+                                try {
+                                    glideData.synth.triggerAttackRelease(randomCatNote, "1n", now);
+                                    console.log(`物体 ${objectId} 采样猫叫: ${randomCatNote}`);
+                                } catch (err) {
+                                    console.warn(`物体 ${objectId} 触发猫叫采样失败:`, err);
+                                }
+                            } else if (glideData.synth.pendingTriggers) {
+                                // 如果采样器尚未加载，手动添加到待处理队列
+                                glideData.synth.pendingTriggers.push({ note: randomCatNote, duration: "1n", time: now });
+                                console.log(`物体 ${objectId} 延迟触发猫叫采样: ${randomCatNote} (等待加载)`);
+                            } else {
+                                console.warn(`物体 ${objectId} 无法触发猫叫采样: 尚未加载且无待处理队列`);
+                            }
+                        }
                         
                         // 更新音符
                         glideData.note = note;
@@ -1400,24 +1437,87 @@ class AudioEngine {
         } else {
             // 创建新的滑音合成器
             try {
-                console.log(`为物体 ${objectId} 创建新的滑音合成器, 初始音符: ${note}`);
+                // 随机决定使用滑音合成器还是采样器（50%的概率）
+                const useSampler = Math.random() > 0.7;// 30%概率使用采样器
+                const synthType = useSampler ? 'sampler' : 'glide';
                 
-                // 创建新的滑音合成器，基于主滑音合成器的设置
-                const objectSynth = this.synthFactory.createCatSynth();
+                console.log(`为物体 ${objectId} 创建新的${useSampler ? '采样猫叫' : '滑音猫叫'}合成器, 初始音符: ${note}`);
                 
-                // 连接到主效果链
-                if (this.mainEffectsChain) {
-                    objectSynth.connect(this.mainEffectsChain.lowcut);
+                let objectSynth;
+                if (useSampler) {
+                    // 使用猫叫采样器
+                    objectSynth = this.synthFactory.createCatSampler({
+                        volume: -4 + (Math.random() * 2 - 1), // -5 到 -3 之间的随机音量
+                        release: 1.5 + (Math.random() * 1 - 0.5) // 1.0 到 2.0 之间的随机释放时间
+                    });
+                    
+                    // 连接到主效果链
+                    if (this.mainEffectsChain) {
+                        objectSynth.connect(this.mainEffectsChain.lowcut);
+                    } else {
+                        objectSynth.toDestination();
+                    }
+                      // 随机选择一个猫叫音频文件
+                    const catNotes = ["C4", "D4", "E4", "F4", "G4", "A4"];
+                    const randomCatNote = catNotes[Math.floor(Math.random() * catNotes.length)];
+                      // 使用安全触发方法，避免缓冲区未加载错误
+                    if (objectSynth.safeTriggerAttackRelease) {
+                        objectSynth.safeTriggerAttackRelease(randomCatNote, "1n", now);
+                        console.log(`使用安全触发方式播放猫叫采样: ${randomCatNote}`);
+                    } else {
+                        // 降级处理：如果没有安全触发方法，检查采样器是否已加载
+                        const isLoaded = objectSynth._isLoaded || (typeof objectSynth.loaded === 'boolean' ? objectSynth.loaded : false);
+                        if (isLoaded) {
+                            try {
+                                objectSynth.triggerAttackRelease(randomCatNote, "1n", now);
+                                console.log(`播放猫叫采样: ${randomCatNote}`);
+                            } catch (err) {
+                                console.warn("触发猫叫采样失败:", err);
+                            }
+                        } else if (objectSynth.pendingTriggers) {
+                            // 如果采样器尚未加载，手动添加到待处理队列
+                            objectSynth.pendingTriggers.push({ note: randomCatNote, duration: "1n", time: now });
+                            console.log(`延迟触发猫叫采样: ${randomCatNote} (等待加载)`);
+                        } else {
+                            console.warn("无法触发猫叫采样: 尚未加载且无待处理队列");
+                        }
+                    }
+                    
                 } else {
-                    objectSynth.toDestination();
+                    // 使用传统的猫叫滑音合成器
+                    objectSynth = this.synthFactory.createCatSynth({
+                        oscillator: { type: 'sawtooth' }, // 猫叫声使用锯齿波
+                        envelope: {
+                            // 使用随机偏置生成更自然的猫叫声参数
+                            attack: 0.1 + (Math.random() * 0.1 - 0.05),    // 范围 0.05-0.15
+                            decay: 0.15 + (Math.random() * 0.1 - 0.05),    // 范围 0.1-0.2
+                            sustain: 0.5 + (Math.random() * 0.2 - 0.1),    // 范围 0.4-0.6
+                            release: 1.5 + (Math.random() * 0.6 - 0.3)     // 范围 1.2-1.8
+                        },
+                        filter: {
+                            Q: 8 + (Math.random() * 4 - 2),           // 范围 6-10
+                            type: "bandpass",
+                            rolloff: -12
+                        },
+                        portamento: portamentoTime,
+                        volume: -8 + (Math.random() * 2 - 1)          // 范围 -9 到 -7
+                    });
+                    
+                    // 连接到主效果链
+                    if (this.mainEffectsChain) {
+                        objectSynth.connect(this.mainEffectsChain.lowcut);
+                    } else {
+                        objectSynth.toDestination();
+                    }
+                    
+                    // 触发滑音
+                    objectSynth.triggerAttack(note, now);
                 }
-                
-                // 触发滑音
-                objectSynth.triggerAttack(note, now);
                 
                 // 存储滑音数据
                 this.objectGlides.set(objectId, {
                     synth: objectSynth,
+                    synthType: synthType, // 记录合成器类型
                     note: note,
                     lastSeen: Date.now()
                 });
@@ -1489,7 +1589,7 @@ class AudioEngine {
         // 每5秒检查一次不活跃的物体
         this.objectCleanupInterval = setInterval(() => {
             const now = Date.now();
-            const inactiveThreshold = 2000; // 2秒不活跃视为消失
+            const inactiveThreshold = 1000; // 1秒不活跃视为消失
             
             // 检查每个物体
             for (const [objectId, glideData] of this.objectGlides.entries()) {
@@ -1499,7 +1599,7 @@ class AudioEngine {
                     this._releaseObjectGlide(objectId);
                 }
             }
-        }, 5000);
+        }, 2000);
     }
 
     /**

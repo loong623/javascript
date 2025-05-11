@@ -211,76 +211,67 @@ class Visualizer {
         
         // Create particles for visualization
         if (this.musicVisualization) {
-            this.createParticles(10);
+            this.createParticles(1);
         }
     }
     
     createParticles(count) {
-        // 如果画布尚未准备好，不创建粒子
         if (!this.canvas.width || !this.canvas.height) return;
-        
+
         for (let i = 0; i < count; i++) {
-            this.particles.push({
-                x: Math.random() * this.canvas.width,
-                y: Math.random() * this.canvas.height,
-                size: Math.random() * 10 + 2,
-                speed: Math.random() * 3 + 1,
-                color: stringToColor(this.lastTimbre || 'default'),
-                angle: Math.random() * Math.PI * 2,
-                life: 1.0  // 粒子生命值为1.0（100%）
-            });
-        }
-        
-        // Limit total particles
-        if (this.particles.length > this.particleCount) {
-            this.particles = this.particles.slice(-this.particleCount);
+            const img = new Image();
+            img.src = `/cat/${Math.ceil(Math.random() * 3)}.jpg`; // 使用相对于 public 的路径
+            img.onload = () => {
+                const particle = {
+                    x: Math.random() * this.canvas.width,
+                    y: Math.random() * this.canvas.height,
+                    size: Math.random() * 30 + 50, // 粒子大小随机
+                    speed: Math.random() * 2 + 1,
+                    angle: Math.random() * Math.PI * 2,
+                    life: 1,
+                    image: img // 使用图片代替颜色
+                };
+                this.particles.push(particle);
+
+                if (this.particles.length > this.particleCount) {
+                    this.particles = this.particles.slice(-this.particleCount);
+                }
+            };
+
+            img.onerror = () => {
+                console.error(`图片加载失败: ${img.src}`);
+            };
         }
     }
     
     drawMusicVisualization() {
-        // 如果画布尚未准备好，不绘制
         if (!this.canvas.width || !this.canvas.height) return;
-        
-        // 粒子数组为空时直接返回
         if (this.particles.length === 0) return;
-        
-        // 计算时间差以平滑动画
+
         const now = Date.now();
         const delta = Math.min((now - this.lastNoteTime) / 1000, 0.1);
         this.lastNoteTime = now;
-        
-        // 准备删除的粒子索引
+
         const toRemove = [];
-        
-        // Draw particles with improved animation
+
         this.particles.forEach((particle, index) => {
-            // Update particle position with delta time for smooth animation
             particle.x += Math.cos(particle.angle) * particle.speed * delta * 60;
             particle.y += Math.sin(particle.angle) * particle.speed * delta * 60;
-            
-            // 减少粒子生命值
-            particle.life -= delta * 0.5;  // 每秒减少50%的生命值
-            
-            // 如果粒子生命结束或者移出屏幕，将其标记为删除
+            particle.life -= delta * 0.5;
+
             if (particle.life <= 0 || 
                 particle.x < -50 || particle.x > this.canvas.width + 50 || 
                 particle.y < -50 || particle.y > this.canvas.height + 50) {
                 toRemove.push(index);
                 return;
             }
-            
-            // Draw particle with fading based on life
+
             this.ctx.globalAlpha = particle.life;
-            this.ctx.fillStyle = particle.color;
-            this.ctx.beginPath();
-            this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-            this.ctx.fill();
+            this.ctx.drawImage(particle.image, particle.x, particle.y, particle.size, particle.size); // 绘制图片
         });
-        
-        // Reset alpha
+
         this.ctx.globalAlpha = 1;
-        
-        // 从后向前删除标记的粒子，以保持索引正确
+
         for (let i = toRemove.length - 1; i >= 0; i--) {
             this.particles.splice(toRemove[i], 1);
         }

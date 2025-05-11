@@ -117,6 +117,9 @@ class Controls {
             .object-detection-panel h3 {
                 margin-top: 0;
                 color: #333;
+                background-color: #f5f5dc; /* 米白色背景 */
+                padding: 10px;
+                border-radius: 4px;
             }
             #object-list {
                 list-style: none;
@@ -145,6 +148,12 @@ class Controls {
             #object-info {
                 font-size: 14px;
                 color: #555;
+            }
+            body {
+                background-image: url('./background/b.png');
+                background-size: cover;
+                background-repeat: no-repeat;
+                background-attachment: fixed;
             }
         `;
         document.head.appendChild(styleEl);
