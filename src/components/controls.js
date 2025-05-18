@@ -31,51 +31,45 @@ class Controls {
     }
 
     createMissingUIElements() {
-        const container = document.querySelector('.container');
-
-        // Create scale selector if it doesn't exist
+        const container = document.querySelector('.container');        // Create scale selector if it doesn't exist
         if (!this.elements.scaleSelect) {
             const scaleContainer = document.createElement('div');
             scaleContainer.className = 'control-group';
             scaleContainer.innerHTML = `
-                <label for="scale-select">音阶:</label>
+                <label for="scale-select">Scale:</label>
                 <select id="scale-select">
-                    <option value="major">大调</option>
-                    <option value="minor">小调</option>
-                    <option value="pentatonic">五声音阶</option>
-                    <option value="blues">蓝调音阶</option>
+                    <option value="major">Major</option>
+                    <option value="minor">Minor</option>
+                    <option value="pentatonic">Pentatonic</option>
+                    <option value="blues">Blues</option>
                 </select>
             `;
             container.appendChild(scaleContainer);
             this.elements.scaleSelect = document.getElementById('scale-select');
-        }
-
-        // Create rhythm selector if it doesn't exist
+        }        // Create rhythm selector if it doesn't exist
         if (!this.elements.rhythmSelect) {
             const rhythmContainer = document.createElement('div');
             rhythmContainer.className = 'control-group';
             rhythmContainer.innerHTML = `
-                <label for="rhythm-select">节奏型:</label>
+                <label for="rhythm-select">Rhythm:</label>
                 <select id="rhythm-select">
-                    <option value="basic">基本</option>
-                    <option value="techno">电子</option>
-                    <option value="jazz">爵士</option>
-                    <option value="latin">拉丁</option>
+                    <option value="basic">Basic</option>
+                    <option value="techno">Techno</option>
+                    <option value="jazz">Jazz</option>
+                    <option value="latin">Latin</option>
                 </select>
             `;
             container.appendChild(rhythmContainer);
             this.elements.rhythmSelect = document.getElementById('rhythm-select');
-        }
-
-        // Create object list if it doesn't exist
+        }        // Create object list if it doesn't exist
         if (!this.elements.objectList) {
             const objectContainer = document.createElement('div');
             objectContainer.className = 'object-detection-panel';
             objectContainer.innerHTML = `
-                <h3>检测的物品</h3>
+                <h3>Detected Objects</h3>
                 <ul id="object-list"></ul>
                 <div class="detection-info">
-                    <div id="detected-object">未检测到物品</div>
+                    <div id="detected-object">No objects detected</div>
                     <div id="object-info"></div>
                 </div>
             `;
@@ -159,12 +153,11 @@ class Controls {
         document.head.appendChild(styleEl);
     }
 
-    setupEventListeners() {
-        // Scale selection
+    setupEventListeners() {        // Scale selection
         if (this.elements.scaleSelect) {
             this.elements.scaleSelect.addEventListener('change', (e) => {
                 this.audioEngine.setScale(e.target.value);
-                this.updateStatus(`音阶已更改为 ${e.target.value}`);
+                this.updateStatus(`Scale changed to ${e.target.value}`);
             });
         }
 
@@ -172,20 +165,19 @@ class Controls {
         if (this.elements.rhythmSelect) {
             this.elements.rhythmSelect.addEventListener('change', (e) => {
                 this.audioEngine.setRhythmPattern(e.target.value);
-                this.updateStatus(`节奏型已更改为 ${e.target.value}`);
+                this.updateStatus(`Rhythm changed to ${e.target.value}`);
             });
         }
     }
 
     updateObjectList(predictions) {
         if (!this.elements.objectList) return;
-        
-        // Clear the list
+          // Clear the list
         this.elements.objectList.innerHTML = '';
         
         if (predictions.length === 0) {
             const li = document.createElement('li');
-            li.textContent = '未检测到物品';
+            li.textContent = 'No objects detected';
             this.elements.objectList.appendChild(li);
             return;
         }
@@ -207,19 +199,16 @@ class Controls {
             if (prediction === predictions[0]) {
                 const detectedObject = document.getElementById('detected-object');
                 const objectInfo = document.getElementById('object-info');
-                
-                if (detectedObject && objectInfo) {
+                  if (detectedObject && objectInfo) {
                     const [x, y, width, height] = prediction.bbox;
-                    detectedObject.textContent = `检测到: ${prediction.class}`;
-                    objectInfo.textContent = `位置: x=${Math.round(x)}, y=${Math.round(y)} | 
-                                              音高: ${this.audioEngine.mapToNote(1 - (y / height))} | 
-                                              节奏: ${this.audioEngine.mapToRhythm(x / width)}`;
+                    detectedObject.textContent = `Detected: ${prediction.class}`;
+                    objectInfo.textContent = `Position: x=${Math.round(x)}, y=${Math.round(y)} | 
+                                              Pitch: ${this.audioEngine.mapToNote(1 - (y / height))} | 
+                                              Rhythm: ${this.audioEngine.mapToRhythm(x / width)}`;
                 }
             }
         });
-    }
-
-    updateStatus(message) {
+    }    updateStatus(message) {
         if (this.elements.statusEl) {
             this.elements.statusEl.textContent = message;
         }

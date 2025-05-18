@@ -340,15 +340,14 @@ class SynthFactory {
                 "G4": "miao/5.wav",
                 "A4": "miao/6.wav"
             };
-            
-            // 默认设置与提供的选项合并
+              // 默认设置与提供的选项合并
             const settings = {
                 urls: catSamples,
                 baseUrl: "/", // 设置基础URL，确保从public目录加载
                 release: 1.5,
                 attack: 0.1,
-                volume: -5,
-                ...options,                onload: () => {
+                volume: -10, // 降低25%音量（从-5减少到-8.75dB）
+                ...options,onload: () => {
                     console.log("猫叫声采样器加载完成，所有样本已准备就绪");
                     // 设置一个自定义标志，表示采样器已经准备好
                     if (catSampler) {

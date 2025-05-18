@@ -173,69 +173,65 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header" style="background-color: #f5f5dc; padding: 20px; border-radius: 8px;">
-            <h1>Interactive Music Generator</h1>
+    <div class="container">        <div class="header" style="background-color: #f5f5dc; padding: 20px; border-radius: 8px;">
+            <h1>Interactive Music Generator (Cat Version)</h1>
         </div>
         
         <div class="description" style="background-color: #f5f5dc; padding: 20px; border-radius: 8px;">
-            <p>使用摄像头识别物品，根据物品在画面中的位置和特征生成音乐。物品的垂直位置（Y坐标）控制音高，水平位置（X坐标）控制音效，物品类型控制音色。</p>
+            <p>Use the camera to identify objects and generate music based on their position and characteristics. The vertical position (Y-coordinate) controls pitch, horizontal position (X-coordinate) controls sound effects, and object type controls timbre.</p>
         </div>
         
         <div class="video-container">
             <video id="video" autoplay playsinline></video>
             <canvas id="canvas"></canvas>
         </div>
-        
-        <div class="controls">
-            <button id="startButton">开始摄像头</button>
-            <button id="stopButton">停止摄像头</button>
-            <button id="toggleVisualization" class="secondary">切换可视化效果</button>
+          <div class="controls">
+            <button id="startButton">Start Camera</button>
+            <button id="stopButton">Stop Camera</button>
+            <button id="toggleVisualization" class="secondary">Toggle Visualization</button>
         </div>
         
-        <div class="status" id="status">等待启动...</div>
+        <div class="status" id="status">Waiting for startup...</div>
         
         <div class="panels">
-            <div class="panel">
-                <h3>音乐设置</h3>
+            <div class="panel">                <h3>Music Settings</h3>
                 <div class="control-group">
-                    <label for="scale-select">音阶</label>
+                    <label for="scale-select">Scale</label>
                     <select id="scale-select">
-                        <option value="major">大调</option>
-                        <option value="minor">小调</option>
-                        <option value="pentatonic">五声音阶</option>
-                        <option value="blues">蓝调音阶</option>
+                        <option value="major">Major</option>
+                        <option value="minor">Minor</option>
+                        <option value="pentatonic">Pentatonic</option>
+                        <option value="blues">Blues</option>
                     </select>
                 </div>
                 
                 <div class="control-group">
-                    <label for="rhythm-select">节奏型</label>
+                    <label for="rhythm-select">Rhythm</label>
                     <select id="rhythm-select">
-                        <option value="basic">基本</option>
-                        <option value="techno">电子</option>
-                        <option value="jazz">爵士</option>
-                        <option value="latin">拉丁</option>
+                        <option value="basic">Basic</option>
+                        <option value="techno">Techno</option>
+                        <option value="jazz">Jazz</option>
+                        <option value="latin">Latin</option>
                     </select>
                 </div>
                 
                 <div class="control-group">
-                    <label for="volume-slider">音量</label>
+                    <label for="volume-slider">Volume</label>
                     <input type="range" id="volume-slider" min="0" max="100" value="80">
                 </div>
             </div>
-            
-            <div class="panel">
-                <h3>检测物品</h3>
-                <div id="detected-object">未检测到物品</div>
+              <div class="panel">
+                <h3>Detected Objects</h3>
+                <div id="detected-object">No objects detected</div>
                 <div id="object-info"></div>
                 <ul id="object-list" class="object-list"></ul>
                 
                 <div class="control-group" style="margin-top: 20px;">
-                    <p style="margin-bottom: 10px;">通过以下方式控制音乐：</p>
+                    <p style="margin-bottom: 10px;">Control music through:</p>
                     <ul style="margin-left: 20px;">
-                        <li>垂直位置（Y轴）：控制音高</li>
-                        <li>水平位置（X轴）：控制音效类型</li>
-                        <li>物品类型：控制音色</li>
+                        <li>Vertical position (Y-axis): Controls pitch</li>
+                        <li>Horizontal position (X-axis): Controls effect type</li>
+                        <li>Object type: Controls timbre</li>
                     </ul>
                 </div>
             </div>
