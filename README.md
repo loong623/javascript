@@ -154,8 +154,8 @@ Interactive Music Generator 交互式音乐生成器
 
 1. **Clone the repository 克隆仓库**
    ```bash
-   git clone https://github.com/your-username/interactive-music-generator.git
-   cd interactive-music-generator
+   git clone https://github.com/loong623/javascript.git
+   cd javascript
    ```
 
 2. **Install dependencies 安装依赖**
