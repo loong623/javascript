@@ -175,10 +175,14 @@
 <body>
     <div class="container">        <div class="header" style="background-color: #f5f5dc; padding: 20px; border-radius: 8px;">
             <h1>Interactive Music Generator (Cat Version)</h1>
-        </div>
-        
-        <div class="description" style="background-color: #f5f5dc; padding: 20px; border-radius: 8px;">
-            <p>Use the camera to identify objects and generate music based on their position and characteristics. The vertical position (Y-coordinate) controls pitch, horizontal position (X-coordinate) controls sound effects, and object type controls timbre.</p>
+        </div>        <div class="description" style="background-color: #f5f5dc; padding: 20px; border-radius: 8px;">
+            <p>使用摄像头识别物体并根据其位置和特性生成音乐。垂直位置(Y坐标)控制音调，水平位置(X坐标)控制音效，物体类型控制音色。</p>
+            <p><strong>🎯 检测模式选择:</strong> 您可以选择两种检测模式：</p>
+            <ul style="text-align: left; max-width: 600px; margin: 10px auto;">
+                <li><strong>🤖 检测人员模式:</strong> 专门检测人体动作，适合体感音乐互动</li>
+                <li><strong>🎨 检测彩色小球模式:</strong> 检测彩色球体，会自动过滤人员以避免手部干扰</li>
+            </ul>
+            <p>支持红、蓝、绿、黄、橙、紫色球体。在控制面板中切换检测模式来体验不同的互动方式！</p>
         </div>
         
         <div class="video-container">
@@ -219,14 +223,29 @@
                     <label for="volume-slider">Volume</label>
                     <input type="range" id="volume-slider" min="0" max="100" value="80">
                 </div>
-            </div>
-              <div class="panel">
+            </div>              <div class="panel">
                 <h3>Detected Objects</h3>
+                <div class="detection-controls" style="margin: 15px 0; padding: 10px; background: #f8f8f8; border-radius: 4px; border: 1px solid #ddd;">
+                    <div class="detection-mode" style="margin-bottom: 15px;">
+                        <label style="display: block; margin: 8px 0; font-weight: bold;">Detection Mode:</label>
+                        <select id="detection-mode-select" style="padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; width: 200px; margin-top: 5px;">
+                            <option value="people">Detect People</option>
+                            <option value="colorBalls">Detect Color Balls</option>
+                        </select>
+                    </div>
+                    <div class="color-settings" id="color-ball-info" style="display: none; margin-top: 10px; font-size: 14px;">
+                        <label style="display: block; margin: 8px 0; font-weight: bold;">Supported Colors: 
+                            <span class="color-info" style="font-weight: normal; color: #666;">Red, Blue, Green, Yellow, Orange, Purple</span>
+                        </label>
+                        <p style="font-size: 12px; color: #666; margin: 5px 0;">
+                            ⚠️ When detecting color balls, people will be filtered out to avoid hand interference
+                        </p>
+                    </div>
+                </div>
                 <div id="detected-object">No objects detected</div>
                 <div id="object-info"></div>
                 <ul id="object-list" class="object-list"></ul>
-                
-                <div class="control-group" style="margin-top: 20px;">
+                  <div class="control-group" style="margin-top: 20px;">
                     <p style="margin-bottom: 10px;">Control music through:</p>
                     <ul style="margin-left: 20px;">
                         <li>Vertical position (Y-axis): Controls pitch</li>
@@ -234,14 +253,26 @@
                         <li>Object type: Controls timbre</li>
                     </ul>
                 </div>
+                
+                <div class="control-group" style="margin-top: 20px; background-color: #f0f8ff; padding: 15px; border-radius: 8px;">
+                    <h4 style="margin-top: 0; color: #2c5aa0;">🎨 Test Color Detection</h4>
+                    <p style="margin-bottom: 8px; font-size: 14px;">Try these colored objects:</p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                        <span style="background: red; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Red Ball</span>
+                        <span style="background: blue; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Blue Ball</span>
+                        <span style="background: green; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Green Ball</span>
+                        <span style="background: orange; color: black; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Orange Ball</span>
+                        <span style="background: yellow; color: black; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Yellow Ball</span>
+                        <span style="background: purple; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Purple Ball</span>
+                    </div>
+                    <p style="font-size: 12px; color: #666; margin: 0;">Move colored balls or spheres in front of the camera to see dual detection in action!</p>
+                </div>
             </div>
         </div>
         
         <div class="footer">
             <p>Interactive Music Generator &copy; 2023</p>
         </div>
-    </div>
-    
-    <script type="module" src="/src/main.js"></script>
+    </div>    <script type="module" src="/src/main.js"></script>
 </body>
 </html>

@@ -145,19 +145,36 @@ class Visualizer {
                 try {
                     const [x, y, width, height] = prediction.bbox;
                     const color = stringToColor(prediction.class);
-                    
-                    if (this.showBoundingBoxes) {
-                        // Draw bounding box
-                        this.ctx.strokeStyle = color;
-                        this.ctx.lineWidth = 2;
+                      if (this.showBoundingBoxes) {
+                        // Use different styles for different detection sources
+                        if (prediction.source === 'color_detection') {
+                            // Color detection: use solid colored boxes with thicker border
+                            this.ctx.strokeStyle = prediction.color || color;
+                            this.ctx.lineWidth = 3;
+                            this.ctx.setLineDash([]);
+                            
+                            // Add a subtle fill for color detections
+                            this.ctx.fillStyle = `${prediction.color || color}20`; // 20% opacity
+                            this.ctx.fillRect(x, y, width, height);
+                        } else {
+                            // Neural network detection: use dashed boxes
+                            this.ctx.strokeStyle = color;
+                            this.ctx.lineWidth = 2;
+                            this.ctx.setLineDash([5, 5]);
+                        }
+                        
                         this.ctx.strokeRect(x, y, width, height);
+                        this.ctx.setLineDash([]); // Reset line dash
                     }
-                    
-                    if (this.showLabels) {
+                      if (this.showLabels) {
+                        // Prepare label text with source indicator
+                        const sourceIndicator = prediction.source === 'color_detection' ? ' 🎨' : ' 🤖';
+                        const labelText = `${prediction.class}${sourceIndicator} (${Math.round(prediction.score * 100)}%)`;
+                        
                         // Draw label with improved visibility
                         // 先绘制黑色背景增强可读性
                         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                        const textWidth = this.ctx.measureText(`${prediction.class} (${Math.round(prediction.score * 100)}%)`).width;
+                        const textWidth = this.ctx.measureText(labelText).width;
                         this.ctx.fillRect(
                             x, 
                             y > 22 ? y - 22 : y,
@@ -166,10 +183,10 @@ class Visualizer {
                         );
                         
                         // 再绘制文字
-                        this.ctx.fillStyle = color;
+                        this.ctx.fillStyle = prediction.source === 'color_detection' ? (prediction.color || color) : color;
                         this.ctx.font = '16px Arial';
                         this.ctx.fillText(
-                            `${prediction.class} (${Math.round(prediction.score * 100)}%)`,
+                            labelText,
                             x + 5,
                             y > 20 ? y - 5 : y + 16
                         );

@@ -176,8 +176,7 @@ class VisionModel {
             return this.latestPredictions;
         }
     }
-    
-    /**
+      /**
      * 过滤检测结果，只保留感兴趣的对象
      * @param {Array} predictions 原始检测结果
      * @returns {Array} 过滤后的检测结果
@@ -186,7 +185,7 @@ class VisionModel {
         const minConfidence = 0.5;
         return predictions.filter(prediction => 
             prediction.score >= minConfidence &&
-            prediction.class === 'person' // 只保留人类
+            this.objectsToDetect.includes(prediction.class)
         );
     }
     

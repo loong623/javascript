@@ -1400,8 +1400,10 @@ class AudioEngine {
                         console.log(`物体 ${objectId} 滑音过渡: ${glideData.note} -> ${note}, 速度: ${moveSpeed.toFixed(5)}`);
                         
                         // 更新音符
-                        glideData.note = note;
-                    } else if (glideData.synthType === 'sampler') {
+                        glideData.note = note;                    } 
+                    /*
+                    // 暂时注释掉采样器处理逻辑，只使用滑音合成器
+                    else if (glideData.synthType === 'sampler') {
                         // 采样器类型：随机选择一个猫叫音频文件播放
                         const catNotes = ["C4", "D4", "E4", "F4", "G4", "A4"];
                         const randomCatNote = catNotes[Math.floor(Math.random() * catNotes.length)];                        // 使用安全触发方法，避免缓冲区未加载错误
@@ -1430,21 +1432,24 @@ class AudioEngine {
                         // 更新音符
                         glideData.note = note;
                     }
+                    */
                 } catch (err) {
                     console.error(`更新物体 ${objectId} 滑音时出错:`, err);
                 }
             }
-        } else {
-            // 创建新的滑音合成器
+        } else {            // 创建新的滑音合成器
             try {
-                // 随机决定使用滑音合成器还是采样器（50%的概率）
-                const useSampler = Math.random() > 0.7;// 30%概率使用采样器
+                // 暂时注释掉采样器功能，只使用滑音合成器
+                // const useSampler = Math.random() > 0.7;// 30%概率使用采样器
+                const useSampler = false; // 强制使用滑音合成器
                 const synthType = useSampler ? 'sampler' : 'glide';
                 
                 console.log(`为物体 ${objectId} 创建新的${useSampler ? '采样猫叫' : '滑音猫叫'}合成器, 初始音符: ${note}`);
                 
                 let objectSynth;
                 if (useSampler) {
+                    // 暂时注释掉采样器代码
+                    /*
                     // 使用猫叫采样器
                     objectSynth = this.synthFactory.createCatSampler({
                         volume: -4 + (Math.random() * 2 - 1), // -5 到 -3 之间的随机音量
@@ -1482,7 +1487,7 @@ class AudioEngine {
                             console.warn("无法触发猫叫采样: 尚未加载且无待处理队列");
                         }
                     }
-                    
+                    */
                 } else {
                     // 使用传统的猫叫滑音合成器
                     objectSynth = this.synthFactory.createCatSynth({

@@ -3,15 +3,15 @@
  */
 
 class Controls {
-    constructor(audioEngine, visionModel) {
+    constructor(audioEngine, visionModel, colorDetection) {
         this.audioEngine = audioEngine;
         this.visionModel = visionModel;
+        this.colorDetection = colorDetection;
         this.elements = {};
         this.isInitialized = false;
     }
 
-    initialize() {
-        // Find all control elements
+    initialize() {        // Find all control elements
         this.elements = {
             startButton: document.getElementById('startButton'),
             stopButton: document.getElementById('stopButton'),
@@ -23,6 +23,10 @@ class Controls {
 
         // Add UI elements if they don't exist
         this.createMissingUIElements();
+        
+        // Get references to newly created elements
+        this.elements.detectionModeSelect = document.getElementById('detection-mode-select');
+        this.elements.colorBallInfo = document.getElementById('color-ball-info');
         
         // Set up event listeners
         this.setupEventListeners();
@@ -61,19 +65,8 @@ class Controls {
             `;
             container.appendChild(rhythmContainer);
             this.elements.rhythmSelect = document.getElementById('rhythm-select');
-        }        // Create object list if it doesn't exist
+        }        // Object list already exists in HTML, just ensure we have reference
         if (!this.elements.objectList) {
-            const objectContainer = document.createElement('div');
-            objectContainer.className = 'object-detection-panel';
-            objectContainer.innerHTML = `
-                <h3>Detected Objects</h3>
-                <ul id="object-list"></ul>
-                <div class="detection-info">
-                    <div id="detected-object">No objects detected</div>
-                    <div id="object-info"></div>
-                </div>
-            `;
-            container.appendChild(objectContainer);
             this.elements.objectList = document.getElementById('object-list');
         }
 
@@ -107,13 +100,49 @@ class Controls {
                 padding: 15px;
                 border-radius: 8px;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            }
-            .object-detection-panel h3 {
+            }            .object-detection-panel h3 {
                 margin-top: 0;
                 color: #333;
                 background-color: #f5f5dc; /* 米白色背景 */
                 padding: 10px;
                 border-radius: 4px;
+            }            .detection-controls {
+                margin: 15px 0;
+                padding: 10px;
+                background: #f8f8f8;
+                border-radius: 4px;
+                border: 1px solid #ddd;
+            }
+            .detection-mode {
+                margin-bottom: 15px;
+            }
+            .detection-mode label {
+                display: block;
+                margin: 8px 0;
+                font-weight: bold;
+            }
+            .detection-mode select {
+                padding: 6px 10px;
+                border-radius: 4px;
+                border: 1px solid #ccc;
+                width: 200px;
+                margin-top: 5px;
+            }
+            .detection-controls label {
+                display: block;
+                margin: 8px 0;
+                font-weight: bold;
+            }
+            .detection-controls input[type="checkbox"] {
+                margin-right: 8px;
+            }
+            .color-settings {
+                margin-top: 10px;
+                font-size: 14px;
+            }
+            .color-info {
+                font-weight: normal;
+                color: #666;
             }
             #object-list {
                 list-style: none;
@@ -151,9 +180,8 @@ class Controls {
             }
         `;
         document.head.appendChild(styleEl);
-    }
-
-    setupEventListeners() {        // Scale selection
+    }    setupEventListeners() {
+        // Scale selection
         if (this.elements.scaleSelect) {
             this.elements.scaleSelect.addEventListener('change', (e) => {
                 this.audioEngine.setScale(e.target.value);
@@ -168,11 +196,41 @@ class Controls {
                 this.updateStatus(`Rhythm changed to ${e.target.value}`);
             });
         }
+        
+        // Detection mode selection
+        if (this.elements.detectionModeSelect) {
+            this.elements.detectionModeSelect.addEventListener('change', (e) => {
+                const mode = e.target.value;
+                this.updateDetectionMode(mode);
+                this.updateStatus(`Detection mode changed to ${mode === 'people' ? 'People' : 'Color Balls'}`);
+            });
+            
+            // Set initial mode
+            this.updateDetectionMode(this.elements.detectionModeSelect.value);
+        }
     }
-
-    updateObjectList(predictions) {
+    
+    updateDetectionMode(mode) {
+        // Show/hide color ball info based on mode
+        if (this.elements.colorBallInfo) {
+            this.elements.colorBallInfo.style.display = mode === 'colorBalls' ? 'block' : 'none';
+        }
+        
+        // Store detection mode for use in main detection loop
+        this.currentDetectionMode = mode;
+        
+        // Enable/disable color detection based on mode
+        if (this.colorDetection) {
+            this.colorDetection.setEnabled(mode === 'colorBalls');
+        }
+    }
+    
+    getDetectionMode() {
+        return this.currentDetectionMode || 'people';
+    }    updateObjectList(predictions) {
         if (!this.elements.objectList) return;
-          // Clear the list
+        
+        // Clear the list
         this.elements.objectList.innerHTML = '';
         
         if (predictions.length === 0) {
@@ -182,33 +240,92 @@ class Controls {
             return;
         }
         
-        // Add each detected object
-        predictions.forEach(prediction => {
-            const li = document.createElement('li');
-            const nameSpan = document.createElement('span');
-            const confidenceSpan = document.createElement('span');
+        const detectionMode = this.getDetectionMode();
+        
+        if (detectionMode === 'people') {
+            // Show people detection results
+            const header = document.createElement('li');
+            header.innerHTML = '<strong>🤖 People Detection:</strong>';
+            header.style.backgroundColor = '#e6f3ff';
+            header.style.fontWeight = 'bold';
+            this.elements.objectList.appendChild(header);
             
-            nameSpan.textContent = prediction.class;
-            confidenceSpan.textContent = `${Math.round(prediction.score * 100)}%`;
+            predictions.forEach(prediction => {
+                this.addPredictionToList(prediction, false);
+            });
+        } else if (detectionMode === 'colorBalls') {
+            // Separate color detection and other neural network results
+            const colorPredictions = predictions.filter(p => p.source === 'color_detection');
+            const otherPredictions = predictions.filter(p => p.source !== 'color_detection');
             
-            li.appendChild(nameSpan);
-            li.appendChild(confidenceSpan);
-            this.elements.objectList.appendChild(li);
-            
-            // If this is the first object, update the detected object info
-            if (prediction === predictions[0]) {
-                const detectedObject = document.getElementById('detected-object');
-                const objectInfo = document.getElementById('object-info');
-                  if (detectedObject && objectInfo) {
-                    const [x, y, width, height] = prediction.bbox;
-                    detectedObject.textContent = `Detected: ${prediction.class}`;
-                    objectInfo.textContent = `Position: x=${Math.round(x)}, y=${Math.round(y)} | 
-                                              Pitch: ${this.audioEngine.mapToNote(1 - (y / height))} | 
-                                              Rhythm: ${this.audioEngine.mapToRhythm(x / width)}`;
-                }
+            // Show color ball detection results first
+            if (colorPredictions.length > 0) {
+                const colorHeader = document.createElement('li');
+                colorHeader.innerHTML = '<strong>🎨 Color Ball Detection:</strong>';
+                colorHeader.style.backgroundColor = '#fff3e6';
+                colorHeader.style.fontWeight = 'bold';
+                this.elements.objectList.appendChild(colorHeader);
+                
+                colorPredictions.forEach(prediction => {
+                    this.addPredictionToList(prediction, true);
+                });
             }
-        });
-    }    updateStatus(message) {
+            
+            // Show other neural network detections (excluding people)
+            if (otherPredictions.length > 0) {
+                const neuralHeader = document.createElement('li');
+                neuralHeader.innerHTML = '<strong>🤖 Other Objects (Neural):</strong>';
+                neuralHeader.style.backgroundColor = '#e6f3ff';
+                neuralHeader.style.fontWeight = 'bold';
+                this.elements.objectList.appendChild(neuralHeader);
+                
+                otherPredictions.forEach(prediction => {
+                    this.addPredictionToList(prediction, false);
+                });
+            }
+        }
+        
+        // Update the main detection info with the first (highest confidence) object
+        if (predictions.length > 0) {
+            const topPrediction = predictions[0];
+            const detectedObject = document.getElementById('detected-object');
+            const objectInfo = document.getElementById('object-info');
+              if (detectedObject && objectInfo) {
+                const [x, y, width, height] = topPrediction.bbox;
+                const source = topPrediction.source === 'color_detection' ? ' (Color)' : ' (Neural)';
+                detectedObject.textContent = `Detected: ${topPrediction.class}${source}`;
+                objectInfo.textContent = `Position: x=${Math.round(x)}, y=${Math.round(y)} | 
+                                          Pitch: ${this.audioEngine.mapToNote(1 - (y / (topPrediction.videoHeight || 480)))} | 
+                                          Rhythm: ${this.audioEngine.mapToRhythm(x / (topPrediction.videoWidth || 640))}`;
+            }
+        }
+    }
+    
+    addPredictionToList(prediction, isColorDetection = false) {
+        const li = document.createElement('li');
+        const nameSpan = document.createElement('span');
+        const confidenceSpan = document.createElement('span');
+        
+        nameSpan.textContent = prediction.class;
+        confidenceSpan.textContent = `${Math.round(prediction.score * 100)}%`;
+        
+        // Add color indicator for color detection results
+        if (isColorDetection && prediction.color) {
+            const colorDot = document.createElement('span');
+            colorDot.style.display = 'inline-block';
+            colorDot.style.width = '12px';
+            colorDot.style.height = '12px';
+            colorDot.style.borderRadius = '50%';
+            colorDot.style.marginRight = '8px';
+            colorDot.style.backgroundColor = prediction.color;
+            colorDot.style.border = '1px solid #333';
+            nameSpan.insertBefore(colorDot, nameSpan.firstChild);
+        }
+        
+        li.appendChild(nameSpan);
+        li.appendChild(confidenceSpan);
+        this.elements.objectList.appendChild(li);
+    }updateStatus(message) {
         if (this.elements.statusEl) {
             this.elements.statusEl.textContent = message;
         }

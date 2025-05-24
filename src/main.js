@@ -1,5 +1,6 @@
 import AudioEngine from './audio/audioEngine.js';
 import VisionModel from './models/visionModel.js';
+import ColorDetection from './models/colorDetection.js';
 import Controls from './components/controls.js';
 import Visualizer from './components/visualizer.js';
 import { debounce } from './utils/helpers.js';
@@ -17,7 +18,8 @@ const volumeSlider = document.getElementById('volume-slider');
 // Create instances of our modules
 const audioEngine = new AudioEngine();
 const visionModel = new VisionModel();
-const controls = new Controls(audioEngine, visionModel);
+const colorDetection = new ColorDetection();
+const controls = new Controls(audioEngine, visionModel, colorDetection);
 const visualizer = new Visualizer(video, canvas);
 
 // Variables
@@ -176,10 +178,10 @@ async function startCamera() {
             console.error('视频播放错误:', err);
             throw new Error('无法播放视频流，请检查浏览器权限设置');
         });
-        
-        // Video is now playing, update state
+          // Video is now playing, update state
         isRunning = true;
         visionModel.setRunningState(true);
+        colorDetection.setRunning(true);
         
         // Set initial volume
         if (volumeSlider) {
@@ -266,10 +268,10 @@ function stopCamera() {
         tracks.forEach(track => track.stop());
         video.srcObject = null;
     }
-    
-    // Update state
+      // Update state
     isRunning = false;
     visionModel.setRunningState(false);
+    colorDetection.setRunning(false);
     
     // Stop animation loop
     if (animationId) {
@@ -299,27 +301,42 @@ async function detectObjects() {
     if (!isRunning) return;
     
     try {
-        // Detect objects
-        const predictions = await visionModel.detectObjects(video);
+        const detectionMode = controls.getDetectionMode();
+        let allPredictions = [];
+        
+        if (detectionMode === 'people') {
+            // Only run neural network detection for people
+            const neuralPredictions = await visionModel.detectObjects(video);
+            // Filter to only include people (and exclude any hands or other objects)
+            const peoplePredictions = neuralPredictions.filter(pred => pred.class === 'person');
+            allPredictions = peoplePredictions;
+        } else if (detectionMode === 'colorBalls') {
+            // Only run color detection for balls
+            const colorPredictions = await colorDetection.detectColorBalls(video);
+            // Also run neural network but filter OUT people to avoid hand interference
+            const neuralPredictions = await visionModel.detectObjects(video);
+            const nonPeoplePredictions = neuralPredictions.filter(pred => pred.class !== 'person');
+            allPredictions = [...colorPredictions, ...nonPeoplePredictions];
+        }
         
         // Add video dimensions to predictions for accurate normalization
-        if (predictions.length > 0) {
-            predictions.forEach(pred => {
+        if (allPredictions.length > 0) {
+            allPredictions.forEach(pred => {
                 pred.videoWidth = video.videoWidth;
                 pred.videoHeight = video.videoHeight;
             });
         }
         
         // Render predictions
-        visualizer.renderPredictions(predictions);
+        visualizer.renderPredictions(allPredictions);
         
         // Update UI with detected objects
-        controls.updateObjectList(predictions);
+        controls.updateObjectList(allPredictions);
         
         // Generate music if objects found, with rate limiting
         const now = Date.now();
-        if (predictions.length > 0 && now - lastMusicGenerationTime >= MUSIC_GENERATION_INTERVAL) {
-            const pattern = audioEngine.generateMusic(predictions);
+        if (allPredictions.length > 0 && now - lastMusicGenerationTime >= MUSIC_GENERATION_INTERVAL) {
+            const pattern = audioEngine.generateMusic(allPredictions);
             lastMusicGenerationTime = now;
             
             // Update visualizer with music info
