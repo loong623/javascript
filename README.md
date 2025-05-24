@@ -6,6 +6,8 @@
 ![AI](https://img.shields.io/badge/AI-TensorFlow.js-ff6f00.svg)
 ![Audio](https://img.shields.io/badge/Audio-Tone.js-purple.svg)
 
+quick start: go to line 143!!! 
+
 ## 🎵 Introduction 简介
 
 An innovative interactive music generator powered by dual computer vision systems. The application combines neural network object detection with advanced color ball recognition to create immersive musical experiences through real-time camera interaction. Users can choose between detecting people or colored balls, with intelligent filtering to avoid interference between detection modes.
